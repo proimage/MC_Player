@@ -60,8 +60,8 @@ If any tag is used as a pair instead of a single tag, all tags of that type have
 
 Heirarchy
 ---------
-player
-	playlist
-		item
-	levels
-		level
+	player
+		playlist
+			item
+		levels
+			level
