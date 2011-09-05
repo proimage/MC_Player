@@ -66,9 +66,9 @@ class Mc_player
 {
 
 
-	private function indent($text,$levels = 1)
+	private function indent($text,$indent_levels = 1)
 	{
-		return ( str_replace(PHP_EOL, PHP_EOL . str_repeat("\t", $levels), $text) );
+		return ( str_replace(PHP_EOL, PHP_EOL . str_repeat("\t", $indent_levels), $text) );
 	}
 
 	private function calculateSize($native_width, $native_height, $fit_in_width, $controlbar, $pl_position, $pl_size, $container_tag)
@@ -119,7 +119,7 @@ class Mc_player
 			$playlist = $SESS->cache['mc']['player']['playlist'];
 			unset($SESS->cache['mc']['player']['playlist']);
 		}
-		elseif ($TMPL->fetch_param('playlist')) // external XML playlist (placed in the file parameter)
+		elseif ($TMPL->fetch_param('playlist')) // external XML playlist (placed in the playlist parameter)
 		{
 			$file = $TMPL->fetch_param('playlist');
 			$is_playlist = true;
@@ -229,6 +229,7 @@ class Mc_player
 		
 		// Streaming stuff
 		$streamer = ($TMPL->fetch_param('streamer')) ? $TMPL->fetch_param('streamer') : '';
+		$http_startparam = ($TMPL->fetch_param('http.startparam')) ? $TMPL->fetch_param('http.startparam') : '';
 		switch ($TMPL->fetch_param('provider'))
 			{
 				case 'http':
@@ -426,6 +427,7 @@ class Mc_player
 			$script_properties['showmute'] = ($showmute) ? PHP_EOL . "'display.showmute': '".$showmute."'" . ',' : '';
 			$script_properties['pl_position'] = ($pl_position) ? PHP_EOL . "'playlist.position': '".$pl_position."'" . ',' : '';
 			$script_properties['pl_size'] = ($pl_size) ? PHP_EOL . "'playlist.size': '".$pl_size."'" . ',' : '';
+			$script_properties['http_startparam'] = ($http_startparam) ? PHP_EOL . "'http.startparam': '".$http_startparam."'" . ',' : '';
 		
 	
 			// Determine which type of player to create based on which
@@ -636,14 +638,14 @@ class Mc_player
 		// Validation & Formatting
 		if (ctype_digit($bitrate)) {
 			$bitrate = 'bitrate: '.$bitrate.', ';
-		} else {
+		} elseif ($bitrate) {
 			$TMPL->log_item("WARNING in MC Player plugin: Specified 'bitrate' for level is not an integer; ignoring parameter");
 			unset($bitrate);
 		}
 		
 		if (ctype_digit($width)) {
 			$width = 'width: '.$width.', ';
-		} else {
+		} elseif ($width) {
 			$TMPL->log_item("WARNING in MC Player plugin: Specified 'width' for level is not an integer; ignoring parameter");
 			unset($width);
 		}
@@ -658,10 +660,9 @@ class Mc_player
 
 		$level = $this->indent(PHP_EOL . "{ " . $bitrate . $width . $file . " },");
 
-
 		// store result in session for use upstream
 		$SESS->cache['mc']['player']['level_list'] .= $level;
-		
+
 	} // END function level()
 
 
