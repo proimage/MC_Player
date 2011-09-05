@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 /*
 	ExpressionEngine - by EllisLab
@@ -52,7 +52,6 @@
 			function mode
 			function config
 */
- 
  
 $plugin_info = array(
 	'pi_name'			=> 'MC Player',
