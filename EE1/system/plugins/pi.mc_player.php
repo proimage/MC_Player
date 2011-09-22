@@ -1,20 +1,6 @@
 ﻿<?php
 
 /*
-	ExpressionEngine - by EllisLab
-	
-	@package		ExpressionEngine
-	@author			ExpressionEngine Dev Team
-	@copyright		Copyright (c) 2003 - 2011, EllisLab, Inc.
-	@license		http://expressionengine.com/user_guide/license.html
-	@link			http://expressionengine.com
-	@since			Version 1.6.x
-	@filesource
-*/
- 
-// ------------------------------------------------------------------------
-
-/*
 	MC Player Plugin
 	
 	@package		ExpressionEngine
@@ -65,13 +51,59 @@ $plugin_info = array(
 class Mc_player
 {
 
-
+	/**
+	 * Indent
+	 * 
+	 * Indents lines in a given string by the specified number of levels
+	 *
+	 * @param		text			String to log
+	 * @param		indent_levels	Num of levels to indent
+	 * @access		private
+	 * @return		string
+	 */
 	private function indent($text,$indent_levels = 1)
 	{
 		return ( str_replace(PHP_EOL, PHP_EOL . str_repeat("\t", $indent_levels), $text) );
 	}
+	
+	/**
+	 * _log_item
+	 * 
+	 * Write items to template debugging log
+	 *
+	 * @param      string    String to log
+	 * @param      int       Tab indention
+	 * @access     private
+	 * @return     void
+	 */
+	private function _log_item($string = FALSE, $indent = 1)
+	{
+		global $TMPL;
+		if ($string)
+		{
+			$tab = str_repeat('&nbsp;', 4 * $indent);
+			$TMPL->log_item($tab . '- ' . $string);
+		}
+	}
+	// End function _log_item()
 
-	private function calculateSize($native_width, $native_height, $fit_in_width, $controlbar, $pl_position, $pl_size, $container_tag)
+
+	/**
+	 * CalculateSize
+	 *
+	 * This function calculates the final size of the video player
+	 *
+	 * @param		native_width	Video width in pixels
+	 * @param		native_height	Video height in pixels
+	 * @param		fit_in_width	Scale the video to fit in this # of pixels
+	 * @param		controlbar		Positioning of the controlbar
+	 * @param		pl_position		Positioning of the playlist
+	 * @param		pl_size			Size to allocate to the playlist
+	 * @access		private
+	 * @return		array
+	 */
+
+	private function calculateSize($native_width, $native_height, $fit_in_width, $controlbar, $pl_position, $pl_size)
 	{
 		$size = array();
 		
@@ -107,6 +139,15 @@ class Mc_player
 		return $size;
 	}
 
+
+	/**
+	 * Play
+	 *
+	 * This function puts everything together into a functional player
+	 *
+	 * @access	public
+	 * @return	string
+	 */
 	function play()
 	{
 		global $TMPL, $SESS;
@@ -114,7 +155,7 @@ class Mc_player
 		// Each parent function, after using a session cache
 		// variable, must unset it to prevent it persisting
 		// beyond the current context.
-		if ($SESS->cache['mc']['player']['playlist']) // inline JSON playlist
+		if (isset($SESS->cache['mc']['player']['playlist'])) // inline JSON playlist
 		{
 			$playlist = $SESS->cache['mc']['player']['playlist'];
 			unset($SESS->cache['mc']['player']['playlist']);
@@ -128,17 +169,17 @@ class Mc_player
 		{
 			$file = $TMPL->fetch_param('file');
 		}
-		$levels = ($SESS->cache['mc']['player']['levels']) ? $SESS->cache['mc']['player']['levels'] : '';
+		$levels = (isset($SESS->cache['mc']['player']['levels'])) ? $SESS->cache['mc']['player']['levels'] : '';
 			unset($SESS->cache['mc']['player']['levels']);
-		$plugins = ($SESS->cache['mc']['player']['plugins']) ? $SESS->cache['mc']['player']['plugins'] : '';
+		$plugins = (isset($SESS->cache['mc']['player']['plugins'])) ? $SESS->cache['mc']['player']['plugins'] : '';
 			unset($SESS->cache['mc']['player']['plugins']);
-		$modes = ($SESS->cache['mc']['player']['modes']) ? $SESS->cache['mc']['player']['modes'] : '';
+		$modes = (isset($SESS->cache['mc']['player']['modes'])) ? $SESS->cache['mc']['player']['modes'] : '';
 			unset($SESS->cache['mc']['player']['modes']);
 		
 	// Validate parameter values
 		
 		// Container tag stuff
-		$container_tag = ($TMPL->fetch_param('container_tag')) ? $TMPL->fetch_param('container_tag') : 'div'; // valid values are 'video' (the default), 'audio', 'div', 'span', 'a'
+		$container_tag = ($TMPL->fetch_param('container_tag')) ? $TMPL->fetch_param('container_tag') : 'video'; // valid values are 'video' (the default), 'audio', 'div', 'span', 'a'
 		if ($TMPL->fetch_param('container_id')) // Use specified ID of container
 		{
 			$container_id = $TMPL->fetch_param('container_id');
@@ -155,8 +196,11 @@ class Mc_player
 		{
 			$container_id = "player_container";
 		}
-				
-		$container_class = ($TMPL->fetch_param('container_class')) ? $TMPL->fetch_param('container_class') : 'media_player'; // class only carries through to the native containers; if they are replaced via js with flash or other players, the class is not respected
+
+		// class only carries through to the native containers;
+		// if they are replaced via js with flash or other
+		// players, the class is not respected
+		$container_class = ($TMPL->fetch_param('container_class')) ? $TMPL->fetch_param('container_class') : 'media_player';
 
 		// Size
 		if ( ctype_digit($TMPL->fetch_param('width')) ) {
@@ -276,21 +320,22 @@ class Mc_player
 		{
 			$specified_pl_position = "size_provided"; // can be anything except explicit TRUE or FALSE
 		}
-		
-		switch ($specified_pl_position) // input value verification
+
+		if (isset($specified_pl_position))
 		{
-			case "left":
-			case "right":
-			case "top":
-			case "bottom":
-				$pl_position = $specified_pl_position;
-				break;
-			case false;
-				break;
-			default:
-				$TMPL->log_item("WARNING in MC Player plugin: Missing or invalid 'playlist_position' for player tag; defaulting to 'bottom'");
-				$pl_position = "bottom";
-				break;
+			switch ($specified_pl_position) // input value verification
+			{
+				case "left":
+				case "right":
+				case "top":
+				case "bottom":
+					$pl_position = $specified_pl_position;
+					break;
+				default:
+					$TMPL->log_item("WARNING in MC Player plugin: Invalid 'playlist_position' for player tag; defaulting to 'bottom'");
+					$pl_position = "bottom";
+					break;
+			}
 		}
 		// end playlist stuff
 		
@@ -306,18 +351,18 @@ class Mc_player
 			$pl_size = $TMPL->fetch_param('playlist_size');
 		}
 		// using $pl_position here merely to help determine if a playlist was specified.
-		elseif ($is_playlist || $pl_position)
+		elseif (isset($is_playlist) || isset($pl_position))
 		{
 			$pl_size = 180;
 		}
 		
-		if ($pl_size && !ctype_digit($pl_size)) { // 'size' should be an integer
+		if (isset($pl_size) && !ctype_digit($pl_size)) { // 'size' should be an integer
 			$TMPL->log_item("WARNING in MC Player plugin: Specified 'playlist_size' for player or 'size' for playlist is not an integer; resetting to default (180)");
 			$pl_size = 180;
 		}
 
 
-		$size = $this->calculateSize($native_width, $native_height, $fit_in_width, $controlbar, $pl_position, $pl_size, $container_tag);
+		$size = $this->calculateSize($native_width, $native_height, $fit_in_width, $controlbar, $pl_position = '', $pl_size = '');
 
 
 		// ----------------------------------------
@@ -501,6 +546,14 @@ class Mc_player
 	} // END function play()
 
 
+	/**
+	 * Playlist
+	 *
+	 * This function combines all playlist items into a list
+	 *
+	 * @access	public
+	 * @return	session cache
+	 */
 	function playlist()
 	{
 		global $TMPL, $SESS;
@@ -521,6 +574,14 @@ class Mc_player
 	} // END function playlist()
 
 
+	/**
+	 * Item
+	 *
+	 * This function prepares each playlist item
+	 *
+	 * @access	public
+	 * @return	session cache
+	 */
 	function item()
 	{
 		global $TMPL, $SESS;
@@ -607,6 +668,14 @@ class Mc_player
 	} // END function item()
 
 
+	/**
+	 * Levels
+	 *
+	 * This function combines each level into a list
+	 *
+	 * @access	public
+	 * @return	session cache
+	 */
 	function levels()
 	{
 		global $TMPL, $SESS;
@@ -624,10 +693,17 @@ class Mc_player
 	} // END function levels()
 
 
+	/**
+	 * Level
+	 *
+	 * This function prepares each level
+	 *
+	 * @access	public
+	 * @return	session cache
+	 */
 	function level()
 	{
 		global $TMPL, $SESS;
-
 
 		// Assignment
 		$bitrate = ($TMPL->fetch_param('bitrate')) ? $TMPL->fetch_param('bitrate') : '';
@@ -666,6 +742,14 @@ class Mc_player
 	} // END function level()
 
 
+	/**
+	 * Plugins
+	 *
+	 * This function combines each plugin into a list
+	 *
+	 * @access	public
+	 * @return	session cache
+	 */
 	function plugins()
 	{
 		global $TMPL, $SESS;
@@ -683,6 +767,14 @@ class Mc_player
 	} // END function plugins()
 
 
+	/**
+	 * Plugin
+	 *
+	 * This function prepares each plugin
+	 *
+	 * @access	public
+	 * @return	session cache
+	 */
 	function plugin()
 	{
 		global $TMPL, $SESS;
@@ -711,6 +803,14 @@ class Mc_player
 	} // END function plugin()
 
 
+	/**
+	 * Modes
+	 *
+	 * This function combines each mode into a list
+	 *
+	 * @access	public
+	 * @return	session cache
+	 */
 	function modes()
 	{
 		global $TMPL, $SESS;
@@ -727,6 +827,14 @@ class Mc_player
 	} // END function modes()
 
 
+	/**
+	 * Mode
+	 *
+	 * This function prepares each player mode
+	 *
+	 * @access	public
+	 * @return	session cache
+	 */
 	function mode()
 	{
 		global $TMPL, $SESS;
@@ -772,6 +880,14 @@ class Mc_player
 	} // END function mode()
 
 
+	/**
+	 * Config
+	 *
+	 * This function deals with configuration variables
+	 *
+	 * @access	public
+	 * @return	session cache
+	 */
 	function config()
 	{
 		global $TMPL, $SESS;
@@ -808,13 +924,31 @@ class Mc_player
 	} // END function config()
 
 
-	// ----------------------------------------------------------
-	// Plugin Usage
-	// ----------------------------------------------------------
+	/**
+	 * Usage
+	 *
+	 * This function describes how the plugin is used.
+	 *
+	 * @access	public
+	 * @return	string
+	 */
 	function usage()
 	{
 		ob_start();
 ?>
+
+== Requirements =====================================================
+
+- JW Media Player 5.7 or higher
+
+== Initial Setup ====================================================
+
+Upload the JW Media Player files to a directory on your server. Then
+add the following line in the <head>...</head> section of your site,
+making sure to modify the path to the script:
+<script type='text/javascript' src='/path/to/jwplayer.js'></script>
+
+== Examples =========================================================
 
 -- Single video file: -----------------------------------------------
 {exp:mc_player:play file="single.mp4" width="320" height="240" playerpath="/path/to/player.swf"}
