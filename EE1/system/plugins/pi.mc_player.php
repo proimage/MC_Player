@@ -1,5 +1,6 @@
 ﻿<?php
 
+
 /*
 	MC Player Plugin
 	
@@ -41,7 +42,7 @@
  
 $plugin_info = array(
 	'pi_name'			=> 'MC Player',
-	'pi_version'		=> '0.1',
+	'pi_version'		=> '0.2',
 	'pi_author'			=> 'Michael C.',
 	'pi_author_url'		=> 'http://www.pro-image.co.il/',
 	'pi_description'	=> 'An imlementation of the JW HTML5 Media Player',
@@ -50,6 +51,11 @@ $plugin_info = array(
 
 class Mc_player
 {
+
+
+
+
+
 
 	/**
 	 * Indent
@@ -102,8 +108,7 @@ class Mc_player
 	 * @access		private
 	 * @return		array
 	 */
-
-	private function calculateSize($native_width, $native_height, $fit_in_width, $controlbar, $pl_position, $pl_size)
+	private function calculateSize($native_width, $native_height, $fit_in_width, $controlbar, $pl_position = '', $pl_size = '')
 	{
 		$size = array();
 		
@@ -184,11 +189,11 @@ class Mc_player
 		{
 			$container_id = $TMPL->fetch_param('container_id');
 		}
-		elseif ($file != '') // generate unique ID based on filename
+		elseif (isset($file) && $file != '') // generate unique ID based on filename
 		{
 			$container_id = 'player_' . str_replace('.','-',basename(html_entity_decode($file)));
 		}
-		elseif ($SESS->cache['mc']['player']['id'] != '')
+		elseif (isset($SESS->cache['mc']['player']['id']) && $SESS->cache['mc']['player']['id'] != '')
 		{
 			$container_id = 'player_' . str_replace('.','-',$SESS->cache['mc']['player']['id']); // Use ID prepared downstream
 		}
@@ -214,23 +219,36 @@ class Mc_player
 		// only. If the controlbar is displayed on bottom,
 		// for example, the element's height would be
 		// $native_height + $skin_height.
-		if ( ctype_digit($TMPL->fetch_param('height')) ) {
+		if ( ctype_digit($TMPL->fetch_param('height')) )
+		{
 			$native_height = $TMPL->fetch_param('height');
-		} elseif ($container_tag == 'audio') {
+		}
+		elseif ($container_tag == 'audio')
+		{
 			$native_height = 0; // Default height for audio player
 			if ($TMPL->fetch_param('height'))
 			{
 				$TMPL->log_item("NOTICE in MC Player plugin: 'container_tag' was set to 'audio', but 'height' was invalid; defaulting to 0");
 			}
-		} else {
+		}
+		else
+		{
 			$native_height = 150; // Default height of <video> element?
 			$TMPL->log_item("WARNING in MC Player plugin: Specified 'height' is not an integer; defaulting to 150");
 		}
 		
-		if ( ctype_digit($TMPL->fetch_param('fit_in_width')) ) {
+		if ( ctype_digit($TMPL->fetch_param('fit_in_width')) )
+		{
 			$fit_in_width = $TMPL->fetch_param('fit_in_width');
-		} elseif ($TMPL->fetch_param('fit_in_width') !== false) {
+		}
+		elseif ($TMPL->fetch_param('fit_in_width') !== false)
+		{
 			$TMPL->log_item("WARNING in MC Player plugin: Specified 'fit_in_width' is not an integer; ignoring");
+			$fit_in_width = '';
+		}
+		else
+		{
+			$fit_in_width = '';
 		}
 		
 		// Other
@@ -245,6 +263,10 @@ class Mc_player
 		elseif ($TMPL->fetch_param('autoplay')) // because I kept forgetting which 'auto-' to use :p
 		{
 			$autostart =  $TMPL->fetch_param('autoplay');
+		}
+		else
+		{
+			$autostart = '';
 		}
 		$bufferlength = ($TMPL->fetch_param('bufferlength')) ? $TMPL->fetch_param('bufferlength') : '';
 		$displayclick = ($TMPL->fetch_param('displayclick')) ? $TMPL->fetch_param('displayclick') : '';
@@ -290,19 +312,21 @@ class Mc_player
 		
 		// Playlist stuff
 		$shuffle = ($TMPL->fetch_param('shuffle')) ? $TMPL->fetch_param('shuffle') : '';
+		$repeat = ($TMPL->fetch_param('repeat')) ? $TMPL->fetch_param('repeat') : '';
 		
-		switch ($TMPL->fetch_param('repeat')) // input value verification
+		switch ($repeat) // input value verification
 		{
 			case "none":
 			case "list":
 			case "always":
 			case "single":
-				$repeat = $TMPL->fetch_param('repeat');
 				break;
 			case false:
+				$repeat = '';
 				break;
 			default:
 				$TMPL->log_item("WARNING in MC Player plugin: Invalid 'repeat' for player tag; ignoring");
+				$repeat = '';
 				break;
 		}
 		
@@ -362,7 +386,7 @@ class Mc_player
 		}
 
 
-		$size = $this->calculateSize($native_width, $native_height, $fit_in_width, $controlbar, $pl_position = '', $pl_size = '');
+		$size = $this->calculateSize($native_width, $native_height, $fit_in_width, $controlbar, $pl_position, $pl_size);
 
 
 		// ----------------------------------------
@@ -419,7 +443,7 @@ class Mc_player
 
 			case "video":
 				$container = PHP_EOL . '<video' . $container_params;
-				if ($file) // $file might be either a media file or an XML playlist
+				if (isset($file) && $file != '') // $file might be either a media file or an XML playlist
 				{
 					$container .= ' src="'.$file.'"';
 				}
@@ -444,15 +468,10 @@ class Mc_player
 		//   Player script code
 		// ----------------------------------------
 		
-		
 		$script_start = PHP_EOL . "<script type='text/javascript'>";
 		$script_start .= PHP_EOL . "jwplayer('" . $container_id . "').setup({";
 		$script .= ($playerpath) ? PHP_EOL . "flashplayer: '".$playerpath."'" . ',' : '';
 
-/*
-		if ($container_tag != 'video') // Flash player gets a lot more properties
-		{
-*/
 			$script_properties = array();
 			$script_properties['wmode'] = ($TMPL->fetch_param('wmode')) ? PHP_EOL . "wmode: '".$TMPL->fetch_param('wmode')."'" . ',' : PHP_EOL . "wmode: 'opaque'" . ',';
 			$script_properties['skin'] = ($TMPL->fetch_param('skin')) ? PHP_EOL . "skin: '".$TMPL->fetch_param('skin')."'" . ',' : '';
@@ -516,26 +535,24 @@ class Mc_player
 				$script .= $value;
 			}
 			
-			switch ($provider)
+			if (isset($provider))
 			{
-				case 'http':
-				case 'rtmp':
-					$script .= PHP_EOL . 'provider: "' . $provider . '",';
-					$script .= ($streamer) ? PHP_EOL . 'streamer: "' . $streamer . '",' : ''; // only valid for RTMP or HTTP
-					break;
-				case 'youtube':
-					$script .= PHP_EOL . 'provider: "' . $provider . '",';
-					break;
-				case '':
-					break;
-				default:
-					$TMPL->log_item("WARNING in MC Player plugin: Specified 'provider' for player is not valid (http|rtmp|youtube); ignoring parameter");
-					unset($provider, $streamer);
-					break;
+				switch ($provider)
+				{
+					case 'http':
+					case 'rtmp':
+						$script .= PHP_EOL . 'provider: "' . $provider . '",';
+						$script .= ($streamer) ? PHP_EOL . 'streamer: "' . $streamer . '",' : ''; // only valid for RTMP or HTTP
+						break;
+					case 'youtube':
+						$script .= PHP_EOL . 'provider: "' . $provider . '",';
+						break;
+					default:
+						$TMPL->log_item("WARNING in MC Player plugin: Specified 'provider' for player is not valid (http|rtmp|youtube); ignoring parameter");
+						unset($provider, $streamer);
+						break;
+				}
 			}
-/*
-		}
-*/
 		
 		$script_end .= PHP_EOL . "});";
 		$script_end .= PHP_EOL . "</script>";
@@ -595,23 +612,33 @@ class Mc_player
 		$description = ($TMPL->fetch_param('description')) ? $TMPL->fetch_param('description') : '';
 		$streamer = ($TMPL->fetch_param('streamer')) ? $TMPL->fetch_param('streamer') : '';
 		$provider = ($TMPL->fetch_param('provider')) ? $TMPL->fetch_param('provider') : '';
-		$levels = ($SESS->cache['mc']['player']['levels']) ? $SESS->cache['mc']['player']['levels'] : '';
+		if (isset($SESS->cache['mc']['player']['levels']))
+		{
+			$levels = $SESS->cache['mc']['player']['levels'];
+		}
+		else
+		{
+			$levels = '';
+		}
 		unset($SESS->cache['mc']['player']['levels']);
 		
 
 	// Validation & Formatting
 		
 		// 'file' or 'levels' required
-		//if (strpos($levels, 'levels:') !== false)
 		if ($levels)
 		{
-			$item .= PHP_EOL . trim($levels, ",\t" . PHP_EOL) . ",";
+			$item = PHP_EOL . trim($levels, ",\t" . PHP_EOL) . ",";
 			if ($file) $TMPL->log_item("NOTICE in MC Player plugin: 'file' specified for playlist item when 'levels' already specified; ignoring 'file'");
 		}
 		elseif ($file)
 		{
+			if (!isset($SESS->cache['mc']['player']['id']))
+			{
+				$SESS->cache['mc']['player']['id'] = '';
+			}
 			$SESS->cache['mc']['player']['id'] .= "_" . basename(html_entity_decode($file)); // used for auto-naming container ID
-			$item .= PHP_EOL . 'file: "'.$file.'",';
+			$item = PHP_EOL . 'file: "'.$file.'",';
 		}
 		else
 		{
@@ -663,6 +690,10 @@ class Mc_player
 		$item = PHP_EOL . "{" . $this->indent(trim($item, ", ")) . PHP_EOL . "},";
 		
 		// store result in session for use upstream
+		if (!isset($SESS->cache['mc']['player']['items']))
+		{
+			$SESS->cache['mc']['player']['items'] = '';
+		}
 		$SESS->cache['mc']['player']['items'] .= $item;
 		
 	} // END function item()
@@ -710,26 +741,34 @@ class Mc_player
 		$width = ($TMPL->fetch_param('width')) ? $TMPL->fetch_param('width') : '';
 		$file = ($TMPL->fetch_param('file')) ? $TMPL->fetch_param('file') : '';
 
-
 		// Validation & Formatting
-		if (ctype_digit($bitrate)) {
+		if (ctype_digit($bitrate))
+		{
 			$bitrate = 'bitrate: '.$bitrate.', ';
-		} elseif ($bitrate) {
+		}
+		elseif ($bitrate)
+		{
 			$TMPL->log_item("WARNING in MC Player plugin: Specified 'bitrate' for level is not an integer; ignoring parameter");
 			unset($bitrate);
 		}
 		
-		if (ctype_digit($width)) {
+		if (ctype_digit($width))
+		{
 			$width = 'width: '.$width.', ';
-		} elseif ($width) {
+		}
+		elseif ($width)
+		{
 			$TMPL->log_item("WARNING in MC Player plugin: Specified 'width' for level is not an integer; ignoring parameter");
 			unset($width);
 		}
 		
-		if ($file) {
+		if ($file)
+		{
 			$SESS->cache['mc']['player']['id'] .= "_" . basename(html_entity_decode($file)); // used for auto-naming container ID
 			$file = 'file: "'.$file.'"';
-		} else {
+		}
+		else
+		{
 			$TMPL->log_item("ERROR in MC Player plugin: No 'file' specified for level; unable to process level");
 			return $TMPL->no_results();
 		}
@@ -960,7 +999,7 @@ making sure to modify the path to the script:
 -- XML Playlist -----------------------------------------------------
 {exp:mc_player:play width="320" height="240" playerpath="/path/to/player.swf"}
 	{exp:mc_player:playlist type="xml" file="videos.xml" position="right" size="360"}
-{/exp:mc_player}
+{/exp:mc_player:play}
 
 
 -- Javascript Playlist ----------------------------------------------
@@ -972,7 +1011,7 @@ making sure to modify the path to the script:
 		{exp:mc_player:item file="entry_3.mp4"}
 
 	{/exp:mc_player:playlist}
-{/exp:mc_player}
+{/exp:mc_player:play}
 
 
 -- File with levels -------------------------------------------------
@@ -984,7 +1023,7 @@ making sure to modify the path to the script:
 			{exp:mc_player:level bitrate="900" file="vid_720.mp4" width="720"}
 
 	{/exp:mc_player:levels}
-{/exp:mc_player}
+{/exp:mc_player:play}
 
 
 -- JS playlist with files & levels ----------------------------------
@@ -1005,7 +1044,7 @@ Note: If any tag is used as a pair instead of a single tag, all tags of that typ
 		{exp:mc_player:item file="entry_4.mp4" image="entry_4.jpg" duration="564"}{/exp:mc_player:item}
 
 	{/exp:mc_player:playlist}
-{/exp:mc_player}
+{/exp:mc_player:play}
 
 
 
