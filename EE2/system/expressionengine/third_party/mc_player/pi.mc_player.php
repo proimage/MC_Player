@@ -386,7 +386,7 @@ class Mc_player
 		}
 
 
-		$size = $this->calculateSize($native_width, $native_height, $fit_in_width, $controlbar, $pl_position, $pl_size);
+		$size = $this->calculateSize($native_width, $native_height, $fit_in_width, $controlbar, $pl_position = '', $pl_size = '');
 
 
 		// ----------------------------------------
