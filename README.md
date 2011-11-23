@@ -1,12 +1,24 @@
-Single file
-===========
+CHANGELOG
+=========
+- 0.2.2 (2011-11-23):
+	- Changed plugin file encoding from "UTF-8" to "UTF-8 without BOM" (suspected as causing "Headers already sent" PHP errors)
+	- Forgot to increment the version number in the previous update. :p
+- 0.2.1 (2011-11-22):
+	- Minor change to prevent some PHP Notice messages when pl_size & pl_position parameters are not provided
+	- Began this changelog
 
-Video
------
+
+EXAMPLES
+========
+
+Single file
+-----------
+
+
+### Video
 	{exp:mc_player:play file="video.mp4" width="480" height="270" playerpath="/path/to/player.swf"}
 
-Audio
------
+### Audio
 	{exp:mc_player:play file="audio.mp3" width="480" playerpath="/path/to/player.swf"
 	 container_tag="audio"}
 
@@ -14,15 +26,13 @@ Note: The JW Player does not yet support the HTML 5 `<audio>` tag; in this case,
 
 
 Playlists
-=========
+---------
 
-XML/RSS
--------
+### XML/RSS
 	{exp:mc_player:play width="480" height="270" playerpath="/path/to/player.swf"
 		playlist="playlist.xml" playlist_position="right" playlist_size="320"}
 
-Javascript
-----------
+### Javascript
 	{exp:mc_player:play width="480" height="270" playerpath="/path/to/player.swf"}
 		{exp:mc_player:playlist position="bottom" size="240"}
 			{exp:mc_player:item file="entry_1.mp4" image="entry_1.jpg" duration="54" title="First item"}
@@ -33,7 +43,7 @@ Javascript
 
 
 File with levels
-================
+----------------
 	{exp:mc_player:play width="480" height="270" playerpath="/path/to/player.swf"
 	 provider="http" http.startparam="starttime"}
 		{exp:mc_player:levels}
@@ -45,7 +55,7 @@ File with levels
 
 
 File with modes
-===============
+---------------
 	{exp:mc_player:play width="480" height="270" file="vid_480.mp4"}
 		{exp:mc_player:modes}
 				{exp:mc_player:mode type="html5"}
@@ -56,7 +66,7 @@ File with modes
 
 
 JS playlist with files & levels
-===============================
+-------------------------------
 	{exp:mc_player:play width="320" height="240"}
 		{exp:mc_player:playlist type="javascript" position="right" size="360"}
 			{exp:mc_player:item file="entry_1.mp4" image="entry_1.jpg" duration="54"}{/exp:mc_player:item}

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 if ( ! defined('BASEPATH')) exit('No direct script access allowed');
 
 /*
@@ -42,7 +42,7 @@ if ( ! defined('BASEPATH')) exit('No direct script access allowed');
  
 $plugin_info = array(
 	'pi_name'			=> 'MC Player',
-	'pi_version'		=> '0.2',
+	'pi_version'		=> '0.2.2',
 	'pi_author'			=> 'Michael C.',
 	'pi_author_url'		=> 'http://www.pro-image.co.il/',
 	'pi_description'	=> 'An imlementation of the JW HTML5 Media Player',
@@ -1025,6 +1025,7 @@ making sure to modify the path to the script:
 	{/exp:mc_player:levels}
 {/exp:mc_player:play}
 
+
 -- JS playlist with files & levels ----------------------------------
 Note: If any tag is used as a pair instead of a single tag, all tags of that type in the template have to be pairs.
 
@@ -1044,9 +1045,6 @@ Note: If any tag is used as a pair instead of a single tag, all tags of that typ
 
 	{/exp:mc_player:playlist}
 {/exp:mc_player:play}
-
-
-
 
 <?php
 		$buffer = ob_get_contents();

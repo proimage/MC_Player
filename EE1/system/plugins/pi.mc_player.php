@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 
 /*
@@ -42,7 +42,7 @@
  
 $plugin_info = array(
 	'pi_name'			=> 'MC Player',
-	'pi_version'		=> '0.2',
+	'pi_version'		=> '0.2.2',
 	'pi_author'			=> 'Michael C.',
 	'pi_author_url'		=> 'http://www.pro-image.co.il/',
 	'pi_description'	=> 'An imlementation of the JW HTML5 Media Player',
@@ -1045,9 +1045,6 @@ Note: If any tag is used as a pair instead of a single tag, all tags of that typ
 
 	{/exp:mc_player:playlist}
 {/exp:mc_player:play}
-
-
-
 
 <?php
 		$buffer = ob_get_contents();
