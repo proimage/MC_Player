@@ -1,19 +1,23 @@
-CHANGELOG
+Changelog
 =========
+- 0.2.3 (2012-02-05):
+	- Fixed a bunch of "undeclared variable" PHP notifications again
+	- Changed how external playlists work (now uses an extra {exp:mc_player:playlist file="playlist.xml"} tag inside the existing {exp:mc_player:play} tags)
+	- Changed default video size from 300x150 to 480x270
+	- Renamed most internal variables for consistency
 - 0.2.2 (2011-11-23):
 	- Changed plugin file encoding from "UTF-8" to "UTF-8 without BOM" (suspected as causing "Headers already sent" PHP errors)
-	- Forgot to increment the version number in the previous update. :p
+	- Forgot to increment the internal version number in the previous update. :p
 - 0.2.1 (2011-11-22):
 	- Minor change to prevent some PHP Notice messages when pl_size & pl_position parameters are not provided
 	- Began this changelog
 
 
-EXAMPLES
+Examples
 ========
 
 Single file
 -----------
-
 
 ### Video
 	{exp:mc_player:play file="video.mp4" width="480" height="270" playerpath="/path/to/player.swf"}
@@ -29,8 +33,9 @@ Playlists
 ---------
 
 ### XML/RSS
-	{exp:mc_player:play width="480" height="270" playerpath="/path/to/player.swf"
-		playlist="playlist.xml" playlist_position="right" playlist_size="320"}
+	{exp:mc_player:play width="480" height="270" playerpath="/path/to/player.swf"}
+		{exp:mc_player:playlist file="playlist.xml" position="right" size="360"}
+	{/exp:mc_player:play}
 
 ### Javascript
 	{exp:mc_player:play width="480" height="270" playerpath="/path/to/player.swf"}
@@ -44,6 +49,7 @@ Playlists
 
 File with levels
 ----------------
+
 	{exp:mc_player:play width="480" height="270" playerpath="/path/to/player.swf"
 	 provider="http" http.startparam="starttime"}
 		{exp:mc_player:levels}
@@ -56,6 +62,7 @@ File with levels
 
 File with modes
 ---------------
+
 	{exp:mc_player:play width="480" height="270" file="vid_480.mp4"}
 		{exp:mc_player:modes}
 				{exp:mc_player:mode type="html5"}
@@ -67,8 +74,9 @@ File with modes
 
 JS playlist with files & levels
 -------------------------------
+
 	{exp:mc_player:play width="320" height="240"}
-		{exp:mc_player:playlist type="javascript" position="right" size="360"}
+		{exp:mc_player:playlist position="right" size="360"}
 			{exp:mc_player:item file="entry_1.mp4" image="entry_1.jpg" duration="54"}{/exp:mc_player:item}
 			{exp:mc_player:item file="entry_2.mp4" image="entry_2.jpg" duration="42"}{/exp:mc_player:item}
 			{exp:mc_player:item}
@@ -82,17 +90,17 @@ JS playlist with files & levels
 		{/exp:mc_player:playlist}
 	{/exp:mc_player:play}
 
-Please note: if any tag is used as a tag pair instead of a single tag, all tags of that specific type must also be pairs (in this case, the `exp:mc_player:item` tag pair)
+Please note: if any tag is used as a tag pair instead of a single tag, all tags of that specific type must also be pairs (in this case, the `exp:mc_player:item` tag pairs)
 
 A simple view of the heirarchy for the above code could be:
 
-	player
-		playlist
-			item 1
-			item 2
-			item 3
-				levels
-					level
-					level
-					level
-			item 4
+	- player
+		-- playlist
+			--- item 1
+			--- item 2
+			--- item 3
+				---- levels
+					----- level
+					----- level
+					----- level
+			--- item 4
