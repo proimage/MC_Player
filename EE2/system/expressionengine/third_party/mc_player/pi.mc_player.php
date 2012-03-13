@@ -42,7 +42,7 @@ if ( ! defined('BASEPATH')) exit('No direct script access allowed');
  
 $plugin_info = array(
 	'pi_name'			=> 'MC Player',
-	'pi_version'		=> '0.2.3',
+	'pi_version'		=> '0.2.4',
 	'pi_author'			=> 'Michael C.',
 	'pi_author_url'		=> 'http://www.pro-image.co.il/',
 	'pi_description'	=> 'An imlementation of the JW HTML5 Media Player',
@@ -115,7 +115,7 @@ class Mc_player
 		$skin_height = 0; // height of skin control interface
 		if ($controlbar != 'over') { $skin_height = 24; }
 
-		if ($fit_in_width)
+		if ($fit_in_width && ($native_height > 0))
 		{
 			$display_width = $fit_in_width;
 			$ratio = $native_width / $native_height;
@@ -226,7 +226,7 @@ class Mc_player
 			else
 			{
 				$this->_log_item("WARNING in MC Player plugin: Specified 'width' is not a number; defaulting to 480");
-				$native_width = 480; // Default width of <video> element
+				$player['params']['native_width'] = 480; // Default width of <video> element
 			}
 		}
 		else // 'width' not specified
@@ -238,14 +238,14 @@ class Mc_player
 		// 'native_height' is the height of the display area only.
 		// If the controlbar is displayed on bottom, for example,
 		// the element's height would be:
-		// 'native_height' + 'skin_height'.
-		if ($this->EE->TMPL->fetch_param('height'))
+		// 'native_height' + 'skin_height'
+		if ($this->EE->TMPL->fetch_param('height') !== FALSE) // if 'height' parameter provided
 		{
-			if ( ctype_digit($this->EE->TMPL->fetch_param('height')) )
+			if ( ctype_digit($this->EE->TMPL->fetch_param('height')) ) // and if it's a number
 			{
-				$player['params']['native_height'] = $this->EE->TMPL->fetch_param('height');
+				$player['params']['native_height'] = $this->EE->TMPL->fetch_param('height'); // use it
 			}
-			elseif ($player['params']['container_tag'] == 'audio')
+			elseif ($player['params']['container_tag'] == 'audio') // if it's not a number, but 'audio' tag was specified
 			{
 				$player['params']['native_height'] = 0; // Default height for audio player
 				if ($this->EE->TMPL->fetch_param('height'))
@@ -255,14 +255,18 @@ class Mc_player
 			}
 			else
 			{
-				$this->_log_item("WARNING in MC Player plugin: Specified 'height' is not an integer; defaulting to 272");
-				$player['params']['native_height'] = 272; // Default height of <video> element
+				$player['params']['native_height'] = ($player['params']['native_width'] / 16) * 9; // Default ratio of <video> element
+				$this->_log_item("WARNING in MC Player plugin: Specified 'height' is not an integer; defaulting to a 16:9 ratio (" . $player['params']['native_width'] . '×' . ($player['params']['native_width'] / 16) * 9 . ")");
 			}
+		}
+		elseif ($player['params']['container_tag'] == 'audio') // 'height' not specified, but container is 'audio'
+		{
+				$player['params']['native_height'] = 0; // Default height for audio player
 		}
 		else // 'height' not specified
 		{
-				$this->_log_item("WARNING in MC Player plugin: 'height' not specified; defaulting to 272");
-				$player['params']['native_height'] = 272;
+				$player['params']['native_height'] = ($player['params']['native_width'] / 16) * 9;
+				$this->_log_item("WARNING in MC Player plugin: 'height' not specified; defaulting to a 16:9 ratio (" . $player['params']['native_width'] . '×' . ($player['params']['native_width'] / 16) * 9 . ")");
 		}
 		
 		if ( ctype_digit($this->EE->TMPL->fetch_param('fit_in_width')) ) // valid fit_in_width specified
@@ -302,41 +306,6 @@ class Mc_player
 		$player['params']['mute'] = $this->EE->TMPL->fetch_param('mute');
 		$player['params']['volume'] = $this->EE->TMPL->fetch_param('volume', '80');
 		$player['params']['showmute'] = $this->EE->TMPL->fetch_param('showmute');
-		
-		// Controlbar
-		if ($this->EE->TMPL->fetch_param('controlbar'))
-		{
-			$player['params']['controlbar'] = $this->EE->TMPL->fetch_param('controlbar');
-			if ( ($player['params']['container_tag'] == 'audio') && ($player['params']['controlbar'] == 'over') )
-			{
-				$this->_log_item("NOTICE in MC Player plugin: Audio container specified but controlbar set to 'over'; may not display as intended.");
-			}
-		}
-		elseif ($player['params']['container_tag'] == 'audio')
-		{
-			$player['params']['controlbar'] = 'bottom';
-		}
-		else
-		{
-			$player['params']['controlbar'] = 'over';
-		}
-		
-		// Streaming stuff
-		$player['params']['streamer'] = $this->EE->TMPL->fetch_param('streamer');
-		$player['params']['http_startparam'] = $this->EE->TMPL->fetch_param('http.startparam');
-		switch ($this->EE->TMPL->fetch_param('provider'))
-			{
-				case 'http':
-				case 'rtmp':
-				case 'youtube':
-					$player['params']['provider'] = $this->EE->TMPL->fetch_param('provider');
-				case false:
-					break;
-				default:
-					$this->_log_item("WARNING in MC Player plugin: Specified 'provider' for player is not valid (http|rtmp|youtube); ignoring parameter");
-					unset($player['params']['provider'], $player['params']['streamer']);
-					break;
-			}
 		
 		// Playlist stuff
 		$player['params']['shuffle'] = $this->EE->TMPL->fetch_param('shuffle');
@@ -381,6 +350,48 @@ class Mc_player
 		{
 			$playlist['params']['size'] = '';
 		}
+		
+		// Controlbar
+		if ($this->EE->TMPL->fetch_param('controlbar') === FALSE AND ($playlist['params']['position'] OR $playlist['params']['size']) AND ( $player['params']['native_height'] == 0 OR ($player['params']['container_tag'] == 'audio' AND $player['params']['native_height'] === FALSE))) // if controlbar is unspecified AND a playlist is showing AND the height would be zero, default the controlbar to top.
+		{
+			$player['params']['controlbar'] = 'top';
+			$this->_log_item("NOTICE in MC Player plugin: Controlbar position defaults to 'top' when player height is zero and a playlist is shown; override with the 'controlbar' parameter.");
+		}
+		elseif ( ($player['params']['native_height'] <= 64) && ($this->EE->TMPL->fetch_param('controlbar') == 'over') ) // warn (but allow) if player height not enough to show controlbar in 'over' mode properly
+		{
+			$player['params']['controlbar'] = 'over';
+			$this->_log_item("WARNING in MC Player plugin: Player height is insufficient for properly displaying the controlbar in 'over' mode; controlbar may not display as intended.");
+		}
+		elseif ( ($player['params']['native_height'] <= 64) && ($this->EE->TMPL->fetch_param('controlbar') === FALSE) ) // default controlbar position for height < 64 is 'bottom'
+		{
+			$player['params']['controlbar'] = 'bottom';
+			$this->_log_item("NOTICE in MC Player plugin: Player height is insufficient for properly displaying the controlbar in the default 'over' mode; defaulting to 'bottom'; override with the 'controlbar' parameter.");
+		}
+		elseif ($this->EE->TMPL->fetch_param('controlbar'))
+		{
+			$player['params']['controlbar'] = $this->EE->TMPL->fetch_param('controlbar');
+		}
+		else
+		{
+			$player['params']['controlbar'] = 'over';
+		}
+		
+		// Streaming stuff
+		$player['params']['streamer'] = $this->EE->TMPL->fetch_param('streamer');
+		$player['params']['http_startparam'] = $this->EE->TMPL->fetch_param('http.startparam');
+		switch ($this->EE->TMPL->fetch_param('provider'))
+			{
+				case 'http':
+				case 'rtmp':
+				case 'youtube':
+					$player['params']['provider'] = $this->EE->TMPL->fetch_param('provider');
+				case false:
+					break;
+				default:
+					$this->_log_item("WARNING in MC Player plugin: Specified 'provider' for player is not valid (http|rtmp|youtube); ignoring parameter");
+					unset($player['params']['provider'], $player['params']['streamer']);
+					break;
+			}
 
 		$player['size'] = $this->calculateSize($player['params']['native_width'], $player['params']['native_height'], $player['params']['fit_in_width'], $player['params']['controlbar'], $playlist['params']['position'], $playlist['params']['size']);
 
@@ -409,13 +420,17 @@ class Mc_player
 
 
 				$container = PHP_EOL . '<video' . $container_params;
-				if ($player['params']['file'])
+				if (isset($player['params']['file']) && $player['params']['file'] != '')
 				{
 					$container .= ' src="'.$player['params']['file'].'"';
 				}
+				elseif (isset($playlist['code']) || (isset($playlist['params']['file']) && $playlist['params']['file'] != '')) // a playlist was specified
+				{
+					// Nothing to do to the container tag here - but don't give an error, all is fine
+				}
 				else
 				{
-					$this->_log_item("ERROR in MC Player plugin: '<video>' element specified but neither 'file' nor 'playlist' parameters provided; unable to continue.");
+					$this->_log_item("ERROR in MC Player plugin: '<audio>' element specified but neither 'file' parameter nor proper 'playlist' tag provided; unable to continue.");
 					return $this->EE->TMPL->no_results();
 				}
 				$container .= ' width="' . $player['size']['width'] . '"';
@@ -571,7 +586,7 @@ class Mc_player
 	 */
 	function playlist()
 	{
-		// global $TMPL, $SESS; //EE1
+
 		
 		$this->EE->session->cache['mc']['player']['playlist_file'] = ($this->EE->TMPL->fetch_param('file')) ? $this->EE->TMPL->fetch_param('file') : '';
 		
@@ -635,7 +650,7 @@ class Mc_player
 	 */
 	function item()
 	{
-		// global $TMPL, $SESS; // EE1
+
 
 		// Assignment
 		$item['params']['file'] = $this->EE->TMPL->fetch_param('file');
@@ -743,7 +758,7 @@ class Mc_player
 	 */
 	function levels()
 	{
-		// global $TMPL, $SESS; // EE1
+
 
 		if (isset($this->EE->session->cache['mc']['player']['level_list']) !== FALSE)
 		{
@@ -825,7 +840,7 @@ class Mc_player
 	 */
 	function plugins()
 	{
-		// global $TMPL, $SESS; // EE1
+
 
 		if (isset($this->EE->session->cache['mc']['player']['plugin_list']) !== FALSE)
 		{
@@ -850,7 +865,7 @@ class Mc_player
 	 */
 	function plugin()
 	{
-		// global $TMPL, $SESS; // EE1
+
 
 		if ($plugin_name = $this->EE->TMPL->fetch_param('plugin_name'))
 		{
@@ -886,7 +901,7 @@ class Mc_player
 	 */
 	function modes()
 	{
-		// global $TMPL, $SESS; // EE1
+
 
 		if (isset($this->EE->session->cache['mc']['player']['mode_list']) !== FALSE)
 		{
@@ -910,7 +925,6 @@ class Mc_player
 	 */
 	function mode()
 	{
-		// global $TMPL, $SESS; // EE1
 		
 		
 		// Assignment
@@ -969,7 +983,6 @@ class Mc_player
 	 */
 	function config()
 	{
-		// global $TMPL, $SESS; // EE1
 
 			// Process each param
 			$params = '';

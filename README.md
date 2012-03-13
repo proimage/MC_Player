@@ -1,5 +1,8 @@
 Changelog
 =========
+- 0.2.4 (2012-03-13):
+	- Made controlbar/playlist positioning smarter by default
+	- Big fixes
 - 0.2.3 (2012-02-05):
 	- Fixed a bunch of "undeclared variable" PHP notifications again
 	- Changed how external playlists work (now uses an extra {exp:mc_player:playlist file="playlist.xml"} tag inside the existing {exp:mc_player:play} tags)

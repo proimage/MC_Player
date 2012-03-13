@@ -42,7 +42,7 @@
  
 $plugin_info = array(
 	'pi_name'			=> 'MC Player',
-	'pi_version'		=> '0.2.3',
+	'pi_version'		=> '0.2.4',
 	'pi_author'			=> 'Michael C.',
 	'pi_author_url'		=> 'http://www.pro-image.co.il/',
 	'pi_description'	=> 'An imlementation of the JW HTML5 Media Player',
@@ -110,7 +110,7 @@ class Mc_player
 		$skin_height = 0; // height of skin control interface
 		if ($controlbar != 'over') { $skin_height = 24; }
 
-		if ($fit_in_width)
+		if ($fit_in_width && ($native_height > 0))
 		{
 			$display_width = $fit_in_width;
 			$ratio = $native_width / $native_height;
@@ -234,13 +234,13 @@ class Mc_player
 		// If the controlbar is displayed on bottom, for example,
 		// the element's height would be:
 		// 'native_height' + 'skin_height'
-		if ($TMPL->fetch_param('height'))
+		if ($TMPL->fetch_param('height')) // if 'height' parameter provided
 		{
-			if ( ctype_digit($TMPL->fetch_param('height')) )
+			if ( ctype_digit($TMPL->fetch_param('height')) ) // and if it's a number
 			{
-				$player['params']['native_height'] = $TMPL->fetch_param('height');
+				$player['params']['native_height'] = $TMPL->fetch_param('height'); // use it
 			}
-			elseif ($player['params']['container_tag'] == 'audio')
+			elseif ($player['params']['container_tag'] == 'audio') // if it's not a number, but 'audio' tag was specified
 			{
 				$player['params']['native_height'] = 0; // Default height for audio player
 				if ($TMPL->fetch_param('height'))
@@ -250,14 +250,18 @@ class Mc_player
 			}
 			else
 			{
-				$TMPL->log_item("WARNING in MC Player plugin: Specified 'height' is not an integer; defaulting to 272");
-				$player['params']['native_height'] = 272; // Default height of <video> element
+				$player['params']['native_height'] = ($player['params']['native_width'] / 16) * 9; // Default ratio of <video> element
+				$TMPL->log_item("WARNING in MC Player plugin: Specified 'height' is not an integer; defaulting to a 16:9 ratio (" . $player['params']['native_width'] . '×' . ($player['params']['native_width'] / 16) * 9 . ")");
 			}
+		}
+		elseif ($player['params']['container_tag'] == 'audio') // 'height' not specified, but container is 'audio'
+		{
+				$player['params']['native_height'] = 0; // Default height for audio player
 		}
 		else // 'height' not specified
 		{
-				$TMPL->log_item("WARNING in MC Player plugin: 'height' not specified; defaulting to 272");
-				$player['params']['native_height'] = 272;
+				$player['params']['native_height'] = ($player['params']['native_width'] / 16) * 9;
+				$TMPL->log_item("WARNING in MC Player plugin: 'height' not specified; defaulting to a 16:9 ratio (" . $player['params']['native_width'] . '×' . ($player['params']['native_width'] / 16) * 9 . ")");
 		}
 
 		if ( ctype_digit($TMPL->fetch_param('fit_in_width')) ) // valid fit_in_width specified
@@ -298,42 +302,7 @@ class Mc_player
 		$player['params']['volume'] = ($TMPL->fetch_param('volume')) ? $TMPL->fetch_param('volume') : '80';
 		$player['params']['showmute'] = ($TMPL->fetch_param('showmute')) ? $TMPL->fetch_param('showmute') : '';
 		
-		// Controlbar
-		if ($TMPL->fetch_param('controlbar'))
-		{
-			$player['params']['controlbar'] = $TMPL->fetch_param('controlbar');
-			if ( ($player['params']['container_tag'] == 'audio') && ($player['params']['controlbar'] == 'over') )
-			{
-				$TMPL->log_item("NOTICE in MC Player plugin: Audio container specified but controlbar set to 'over'; may not display as intended.");
-			}
-		}
-		elseif ($player['params']['container_tag'] == 'audio')
-		{
-			$player['params']['controlbar'] = 'bottom';
-		}
-		else
-		{
-			$player['params']['controlbar'] = 'over';
-		}
-		
-		// Streaming stuff
-		$player['params']['streamer'] = ($TMPL->fetch_param('streamer')) ? $TMPL->fetch_param('streamer') : '';
-		$player['params']['http_startparam'] = ($TMPL->fetch_param('http.startparam')) ? $TMPL->fetch_param('http.startparam') : '';
-		switch ($TMPL->fetch_param('provider'))
-			{
-				case 'http':
-				case 'rtmp':
-				case 'youtube':
-					$player['params']['provider'] = $TMPL->fetch_param('provider');
-				case false:
-					break;
-				default:
-					$TMPL->log_item("WARNING in MC Player plugin: Specified 'provider' for player is not valid (http|rtmp|youtube); ignoring parameter");
-					unset($player['params']['provider'], $player['params']['streamer']);
-					break;
-			}
-		
-		// Playlist behavior
+		// Playlist stuff
 		$player['params']['shuffle'] = ($TMPL->fetch_param('shuffle')) ? $TMPL->fetch_param('shuffle') : '';
 		$player['params']['repeat'] = ($TMPL->fetch_param('repeat')) ? $TMPL->fetch_param('repeat') : '';
 		
@@ -376,6 +345,48 @@ class Mc_player
 		{
 			$playlist['params']['size'] = '';
 		}
+		
+		// Controlbar
+		if ($TMPL->fetch_param('controlbar') === FALSE AND ($playlist['params']['position'] OR $playlist['params']['size']) AND ( $player['params']['native_height'] == 0 OR ($player['params']['container_tag'] == 'audio' AND $player['params']['native_height'] === FALSE))) // if controlbar is unspecified AND a playlist is showing AND the height would be zero, default the controlbar to top.
+		{
+			$player['params']['controlbar'] = 'top';
+			$TMPL->log_item("NOTICE in MC Player plugin: Controlbar position defaults to 'top' when player height is zero and a playlist is shown; override with the 'controlbar' parameter.");
+		}
+		elseif ( ($player['params']['native_height'] <= 64) && ($TMPL->fetch_param('controlbar') == 'over') ) // warn (but allow) if player height not enough to show controlbar in 'over' mode properly
+		{
+			$player['params']['controlbar'] = 'over';
+			$TMPL->log_item("WARNING in MC Player plugin: Player height is insufficient for properly displaying the controlbar in 'over' mode; controlbar may not display as intended.");
+		}
+		elseif ( ($player['params']['native_height'] <= 64) && ($TMPL->fetch_param('controlbar') === FALSE) ) // default controlbar position for height < 64 is 'bottom'
+		{
+			$player['params']['controlbar'] = 'bottom';
+			$TMPL->log_item("NOTICE in MC Player plugin: Player height is insufficient for properly displaying the controlbar in the default 'over' mode; defaulting to 'bottom'; override with the 'controlbar' parameter.");
+		}
+		elseif ($TMPL->fetch_param('controlbar'))
+		{
+			$player['params']['controlbar'] = $TMPL->fetch_param('controlbar');
+		}
+		else
+		{
+			$player['params']['controlbar'] = 'over';
+		}
+		
+		// Streaming stuff
+		$player['params']['streamer'] = ($TMPL->fetch_param('streamer')) ? $TMPL->fetch_param('streamer') : '';
+		$player['params']['http_startparam'] = ($TMPL->fetch_param('http.startparam')) ? $TMPL->fetch_param('http.startparam') : '';
+		switch ($TMPL->fetch_param('provider'))
+			{
+				case 'http':
+				case 'rtmp':
+				case 'youtube':
+					$player['params']['provider'] = $TMPL->fetch_param('provider');
+				case false:
+					break;
+				default:
+					$TMPL->log_item("WARNING in MC Player plugin: Specified 'provider' for player is not valid (http|rtmp|youtube); ignoring parameter");
+					unset($player['params']['provider'], $player['params']['streamer']);
+					break;
+			}
 
 		$player['size'] = $this->calculateSize($player['params']['native_width'], $player['params']['native_height'], $player['params']['fit_in_width'], $player['params']['controlbar'], $playlist['params']['position'], $playlist['params']['size']);
 
@@ -404,13 +415,17 @@ class Mc_player
 
 
 				$container = PHP_EOL . '<video' . $container_params;
-				if ($player['params']['file'])
+				if (isset($player['params']['file']) && $player['params']['file'] != '')
 				{
 					$container .= ' src="'.$player['params']['file'].'"';
 				}
+				elseif (isset($playlist['code']) || (isset($playlist['params']['file']) && $playlist['params']['file'] != '')) // a playlist was specified
+				{
+					// Nothing to do to the container tag here - but don't give an error, all is fine
+				}
 				else
 				{
-					$TMPL->log_item("ERROR in MC Player plugin: '<video>' element specified but neither 'file' nor 'playlist' parameters provided; unable to continue.");
+					$TMPL->log_item("ERROR in MC Player plugin: '<audio>' element specified but neither 'file' parameter nor proper 'playlist' tag provided; unable to continue.");
 					return $TMPL->no_results();
 				}
 				$container .= ' width="' . $player['size']['width'] . '"';
