@@ -42,7 +42,7 @@
  
 $plugin_info = array(
 	'pi_name'			=> 'MC Player',
-	'pi_version'		=> '0.2.4',
+	'pi_version'		=> '0.2.5',
 	'pi_author'			=> 'Michael C.',
 	'pi_author_url'		=> 'http://www.pro-image.co.il/',
 	'pi_description'	=> 'An imlementation of the JW HTML5 Media Player',
@@ -51,6 +51,29 @@ $plugin_info = array(
 
 class Mc_player
 {
+
+	function Mc_player()
+	{
+
+		/*
+		 * As seen here: https://github.com/newism/nsm.body_class.ee_addon/pull/1/files
+		 * @danott fork
+		 * Technique from @erikreagan in Dan Benjamin's Shrimp plugin
+		 * EE version check to properly reference our EE objects
+		 */
+		if (version_compare(APP_VER, '2', '<'))
+		{
+			// EE 1.x is in play
+			global $TMPL, $SESS;
+			$this->TMPL =& $TMPL;
+			$this->SESS =& $SESS;
+		} else {
+			// EE 2.x is in play
+			$this->EE  =& get_instance();
+			$this->TMPL =& $this->EE->TMPL;
+			$this->SESS =& $this->EE->session;
+		}
+	}
 
 	/**
 	 * Indent
@@ -79,11 +102,11 @@ class Mc_player
 	 */
 	private function _log_item($string = FALSE, $indent = 1)
 	{
-		global $TMPL;
+
 		if ($string)
 		{
 			$tab = str_repeat('&nbsp;', 4 * $indent);
-			$TMPL->log_item($tab . '- ' . $string);
+			$this->TMPL->log_item($tab . '- ' . $string);
 		}
 	}
 	// End function _log_item()
@@ -150,56 +173,71 @@ class Mc_player
 	 */
 	function play()
 	{
-		global $TMPL, $SESS;
 
 		// Each parent function, after using a session cache
 		// variable, must unset it to prevent it persisting
 		// beyond the current context.
 
 		// playlist embedded tag
-		if (isset($SESS->cache['mc']['player']['playlist'])) // inline JSON playlist
+		if (isset($this->SESS->cache['mc']['player']['playlist'])) // inline JSON playlist
 		{
-			$playlist['code'] = $SESS->cache['mc']['player']['playlist'];
-			unset($SESS->cache['mc']['player']['playlist']);
+			$playlist['code'] = $this->SESS->cache['mc']['player']['playlist'];
+			unset($this->SESS->cache['mc']['player']['playlist']);
 		}
-		elseif (isset($SESS->cache['mc']['player']['playlist_file']))  // external XML playlist (placed in the playlist tag)
+		elseif (isset($this->SESS->cache['mc']['player']['playlist_file']))  // external XML playlist (placed in the playlist tag)
 		{
-			$playlist['params']['file'] = $SESS->cache['mc']['player']['playlist_file'];
-			unset($SESS->cache['mc']['player']['playlist_file']);
+			$playlist['params']['file'] = $this->SESS->cache['mc']['player']['playlist_file'];
+			unset($this->SESS->cache['mc']['player']['playlist_file']);
 		}
-		elseif ($TMPL->fetch_param('file')) // single file
+		elseif ($this->TMPL->fetch_param('file')) // single file
 		{
-			$player['params']['file'] = $TMPL->fetch_param('file');
+			$player['params']['file'] = $this->TMPL->fetch_param('file');
 		}
 
 		// levels embedded tag
-		$levels = (isset($SESS->cache['mc']['player']['levels'])) ? $SESS->cache['mc']['player']['levels'] : '';
-			unset($SESS->cache['mc']['player']['levels']);
+		$levels = (isset($this->SESS->cache['mc']['player']['levels'])) ? $this->SESS->cache['mc']['player']['levels'] : '';
+			unset($this->SESS->cache['mc']['player']['levels']);
 
 		// plugins embedded tag
-		$plugins = (isset($SESS->cache['mc']['player']['plugins'])) ? $SESS->cache['mc']['player']['plugins'] : '';
-			unset($SESS->cache['mc']['player']['plugins']);
+		$plugins = (isset($this->SESS->cache['mc']['player']['plugins'])) ? $this->SESS->cache['mc']['player']['plugins'] : '';
+			unset($this->SESS->cache['mc']['player']['plugins']);
 
 		// modes embedded tag
-		$modes = (isset($SESS->cache['mc']['player']['modes'])) ? $SESS->cache['mc']['player']['modes'] : '';
-			unset($SESS->cache['mc']['player']['modes']);
+		$modes = (isset($this->SESS->cache['mc']['player']['modes'])) ? $this->SESS->cache['mc']['player']['modes'] : '';
+			unset($this->SESS->cache['mc']['player']['modes']);
+		/*
+			Prepare a warning if modes are specified with HTML5 before
+			flash AND a playlist is specified.
+			
+			HTML5 mode requires native browser playback support for any
+			given media format. The player script detects if a browser
+			supports playback of the specified media file in the
+			specified mode. Firefox & Opera don't currently (Q1 2012)
+			support MP4 playback, but the script is unable to detect
+			media file formats when they are in a playlist, and thus
+			will not fall back to Flash mode in that specific instance.
+		*/
+		if ( (strpos($modes, 'html5') < strpos($modes, 'flash')) && (isset($playlist['code']) || isset($playlist['params']['file'])) )
+		{ 
+			$this->_log_item("WARNING in MC Player plugin: 'html5' mode and a playlist were both specified. Browsers will be unable to play media files they do not natively support. Either prioritize 'flash' over 'html5' modes, or use individual files instead of a playlist to fix the issue.");
+		}
 
 
 	// Validate parameter values
 		
 		// Container tag stuff
-		$player['params']['container_tag'] = ($TMPL->fetch_param('container_tag')) ? $TMPL->fetch_param('container_tag') : 'video'; // valid values are 'video' (the default), 'audio', 'div', 'span', 'a'
-		if ($TMPL->fetch_param('container_id')) // Use specified ID of container
+		$player['params']['container_tag'] = ($this->TMPL->fetch_param('container_tag')) ? $this->TMPL->fetch_param('container_tag') : 'div'; // valid values are 'div' (the default), 'video', 'audio', 'span', 'a'
+		if ($this->TMPL->fetch_param('container_id')) // Use specified ID of container
 		{
-			$player['params']['container_id'] = $TMPL->fetch_param('container_id');
+			$player['params']['container_id'] = $this->TMPL->fetch_param('container_id');
 		}
 		elseif (isset($player['params']['file']) && $player['params']['file'] != '') // generate unique ID based on filename
 		{
 			$player['params']['container_id'] = 'player_' . str_replace('.','-',basename(html_entity_decode($player['params']['file'])));
 		}
-		elseif (isset($SESS->cache['mc']['player']['id']) && $SESS->cache['mc']['player']['id'] != '')
+		elseif (isset($this->SESS->cache['mc']['player']['id']) && $this->SESS->cache['mc']['player']['id'] != '')
 		{
-			$player['params']['container_id'] = 'player_' . str_replace('.','-',$SESS->cache['mc']['player']['id']); // Use ID prepared downstream
+			$player['params']['container_id'] = 'player_' . str_replace('.','-',$this->SESS->cache['mc']['player']['id']); // Use ID prepared downstream
 		}
 		else // resort to a default ID
 		{
@@ -209,24 +247,24 @@ class Mc_player
 		// class only carries through to the native containers;
 		// if they are replaced via js with flash or other
 		// players, the class is not respected
-		$player['params']['container_class'] = ($TMPL->fetch_param('container_class')) ? $TMPL->fetch_param('container_class') : 'media_player';
+		$player['params']['container_class'] = ($this->TMPL->fetch_param('container_class')) ? $this->TMPL->fetch_param('container_class') : 'media_player';
 
 		// Sizes
-		if ($TMPL->fetch_param('width')) // 'width' specified
+		if ($this->TMPL->fetch_param('width')) // 'width' specified
 		{
-			if ( ctype_digit($TMPL->fetch_param('width')) ) // and if the width is a digit
+			if ( ctype_digit($this->TMPL->fetch_param('width')) ) // and if the width is a digit
 			{
-				$player['params']['native_width'] = $TMPL->fetch_param('width');
+				$player['params']['native_width'] = $this->TMPL->fetch_param('width');
 			}
 			else
 			{
-				$TMPL->log_item("WARNING in MC Player plugin: Specified 'width' is not a number; defaulting to 480");
+				$this->_log_item("WARNING in MC Player plugin: Specified 'width' is not a number; defaulting to 480");
 				$player['params']['native_width'] = 480; // Default width of <video> element
 			}
 		}
 		else // 'width' not specified
 		{
-				$TMPL->log_item("WARNING in MC Player plugin: 'width' not specified; defaulting to 480");
+				$this->_log_item("WARNING in MC Player plugin: 'width' not specified; defaulting to 480");
 				$player['params']['native_width'] = 480;
 		}
 
@@ -234,24 +272,24 @@ class Mc_player
 		// If the controlbar is displayed on bottom, for example,
 		// the element's height would be:
 		// 'native_height' + 'skin_height'
-		if ($TMPL->fetch_param('height')) // if 'height' parameter provided
+		if ($this->TMPL->fetch_param('height') !== FALSE) // if 'height' parameter provided
 		{
-			if ( ctype_digit($TMPL->fetch_param('height')) ) // and if it's a number
+			if ( ctype_digit($this->TMPL->fetch_param('height')) ) // and if it's a number
 			{
-				$player['params']['native_height'] = $TMPL->fetch_param('height'); // use it
+				$player['params']['native_height'] = $this->TMPL->fetch_param('height'); // use it
 			}
 			elseif ($player['params']['container_tag'] == 'audio') // if it's not a number, but 'audio' tag was specified
 			{
 				$player['params']['native_height'] = 0; // Default height for audio player
-				if ($TMPL->fetch_param('height'))
+				if ($this->TMPL->fetch_param('height'))
 				{
-					$TMPL->log_item("NOTICE in MC Player plugin: 'container_tag' was set to 'audio', but 'height' was invalid; defaulting to 0");
+					$this->_log_item("NOTICE in MC Player plugin: 'container_tag' was set to 'audio', but 'height' was invalid; defaulting to 0");
 				}
 			}
 			else
 			{
 				$player['params']['native_height'] = ($player['params']['native_width'] / 16) * 9; // Default ratio of <video> element
-				$TMPL->log_item("WARNING in MC Player plugin: Specified 'height' is not an integer; defaulting to a 16:9 ratio (" . $player['params']['native_width'] . '×' . ($player['params']['native_width'] / 16) * 9 . ")");
+				$this->_log_item("WARNING in MC Player plugin: Specified 'height' is not an integer; defaulting to a 16:9 ratio (" . $player['params']['native_width'] . 'Ã—' . ($player['params']['native_width'] / 16) * 9 . ")");
 			}
 		}
 		elseif ($player['params']['container_tag'] == 'audio') // 'height' not specified, but container is 'audio'
@@ -261,16 +299,16 @@ class Mc_player
 		else // 'height' not specified
 		{
 				$player['params']['native_height'] = ($player['params']['native_width'] / 16) * 9;
-				$TMPL->log_item("WARNING in MC Player plugin: 'height' not specified; defaulting to a 16:9 ratio (" . $player['params']['native_width'] . '×' . ($player['params']['native_width'] / 16) * 9 . ")");
+				$this->_log_item("WARNING in MC Player plugin: 'height' not specified; defaulting to a 16:9 ratio (" . $player['params']['native_width'] . 'Ã—' . ($player['params']['native_width'] / 16) * 9 . ")");
 		}
 
-		if ( ctype_digit($TMPL->fetch_param('fit_in_width')) ) // valid fit_in_width specified
+		if ( ctype_digit($this->TMPL->fetch_param('fit_in_width')) ) // valid fit_in_width specified
 		{
-			$player['params']['fit_in_width'] = $TMPL->fetch_param('fit_in_width');
+			$player['params']['fit_in_width'] = $this->TMPL->fetch_param('fit_in_width');
 		}
-		elseif ($TMPL->fetch_param('fit_in_width') !== false)
+		elseif ($this->TMPL->fetch_param('fit_in_width') !== false)
 		{
-			$TMPL->log_item("WARNING in MC Player plugin: Specified 'fit_in_width' is not an integer; ignoring");
+			$this->_log_item("WARNING in MC Player plugin: Specified 'fit_in_width' is not an integer; ignoring");
 			$player['params']['fit_in_width'] = '';
 		}
 		else
@@ -279,32 +317,32 @@ class Mc_player
 		}
 
 		// Other
-		$player['params']['playerpath'] = ($TMPL->fetch_param('playerpath')) ? $TMPL->fetch_param('playerpath') : '';
-		$player['params']['bgcolor'] = ($TMPL->fetch_param('bgcolor')) ? $TMPL->fetch_param('bgcolor') : '';
-		$player['params']['image'] = ($TMPL->fetch_param('image')) ? $TMPL->fetch_param('image') : '';
-		$player['params']['link'] = ($TMPL->fetch_param('link')) ? $TMPL->fetch_param('link') : '';
-		if ($TMPL->fetch_param('autostart'))
+		$player['params']['playerpath'] = ($this->TMPL->fetch_param('playerpath')) ? $this->TMPL->fetch_param('playerpath') : '';
+		$player['params']['bgcolor'] = ($this->TMPL->fetch_param('bgcolor')) ? $this->TMPL->fetch_param('bgcolor') : '';
+		$player['params']['image'] = ($this->TMPL->fetch_param('image')) ? $this->TMPL->fetch_param('image') : '';
+		$player['params']['link'] = ($this->TMPL->fetch_param('link')) ? $this->TMPL->fetch_param('link') : '';
+		if ($this->TMPL->fetch_param('autostart'))
 		{
-			$player['params']['autostart'] = $TMPL->fetch_param('autostart');
+			$player['params']['autostart'] = $this->TMPL->fetch_param('autostart');
 		}
-		elseif ($TMPL->fetch_param('autoplay')) // because I kept forgetting which 'auto-' to use :p
+		elseif ($this->TMPL->fetch_param('autoplay')) // because I kept forgetting which 'auto-' to use :p
 		{
-			$player['params']['autostart'] =  $TMPL->fetch_param('autoplay');
+			$player['params']['autostart'] = $this->TMPL->fetch_param('autoplay');
 		}
 		else
 		{
 			$player['params']['autostart'] = '';
 		}
-		$player['params']['bufferlength'] = ($TMPL->fetch_param('bufferlength')) ? $TMPL->fetch_param('bufferlength') : '';
-		$player['params']['displayclick'] = ($TMPL->fetch_param('displayclick')) ? $TMPL->fetch_param('displayclick') : '';
-		$player['params']['fullscreen'] = ($TMPL->fetch_param('fullscreen')) ? $TMPL->fetch_param('fullscreen') : '';
-		$player['params']['mute'] = ($TMPL->fetch_param('mute')) ? $TMPL->fetch_param('mute') : '';
-		$player['params']['volume'] = ($TMPL->fetch_param('volume')) ? $TMPL->fetch_param('volume') : '80';
-		$player['params']['showmute'] = ($TMPL->fetch_param('showmute')) ? $TMPL->fetch_param('showmute') : '';
+		$player['params']['bufferlength'] = ($this->TMPL->fetch_param('bufferlength')) ? $this->TMPL->fetch_param('bufferlength') : '';
+		$player['params']['displayclick'] = ($this->TMPL->fetch_param('displayclick')) ? $this->TMPL->fetch_param('displayclick') : '';
+		$player['params']['fullscreen'] = ($this->TMPL->fetch_param('fullscreen')) ? $this->TMPL->fetch_param('fullscreen') : '';
+		$player['params']['mute'] = ($this->TMPL->fetch_param('mute')) ? $this->TMPL->fetch_param('mute') : '';
+		$player['params']['volume'] = ($this->TMPL->fetch_param('volume')) ? $this->TMPL->fetch_param('volume') : '80';
+		$player['params']['showmute'] = ($this->TMPL->fetch_param('showmute')) ? $this->TMPL->fetch_param('showmute') : '';
 		
 		// Playlist stuff
-		$player['params']['shuffle'] = ($TMPL->fetch_param('shuffle')) ? $TMPL->fetch_param('shuffle') : '';
-		$player['params']['repeat'] = ($TMPL->fetch_param('repeat')) ? $TMPL->fetch_param('repeat') : '';
+		$player['params']['shuffle'] = ($this->TMPL->fetch_param('shuffle')) ? $this->TMPL->fetch_param('shuffle') : '';
+		$player['params']['repeat'] = ($this->TMPL->fetch_param('repeat')) ? $this->TMPL->fetch_param('repeat') : '';
 		
 		switch ($player['params']['repeat']) // input value verification
 		{
@@ -317,16 +355,16 @@ class Mc_player
 				$player['params']['repeat'] = '';
 				break;
 			default:
-				$TMPL->log_item("WARNING in MC Player plugin: Invalid 'repeat' for player tag; ignoring");
+				$this->_log_item("WARNING in MC Player plugin: Invalid 'repeat' for player tag; ignoring");
 				$player['params']['repeat'] = '';
 				break;
 		}
 		
 		// Playlist position
-		if (isset($SESS->cache['mc']['player']['playlist_position']) !== false)
+		if (isset($this->SESS->cache['mc']['player']['playlist_position']) !== false)
 		{
-			$playlist['params']['position'] = $SESS->cache['mc']['player']['playlist_position'];
-				unset($SESS->cache['mc']['player']['playlist_position']);
+			$playlist['params']['position'] = $this->SESS->cache['mc']['player']['playlist_position'];
+				unset($this->SESS->cache['mc']['player']['playlist_position']);
 		}
 		else
 		{
@@ -336,10 +374,10 @@ class Mc_player
 		
 		
 		// Playlist Size
-		if (isset($SESS->cache['mc']['player']['playlist_size']) !== false)
+		if (isset($this->SESS->cache['mc']['player']['playlist_size']) !== false)
 		{
-			$playlist['params']['size'] = $SESS->cache['mc']['player']['playlist_size'];
-				unset($SESS->cache['mc']['player']['playlist_size']);
+			$playlist['params']['size'] = $this->SESS->cache['mc']['player']['playlist_size'];
+				unset($this->SESS->cache['mc']['player']['playlist_size']);
 		}
 		else
 		{
@@ -347,24 +385,24 @@ class Mc_player
 		}
 		
 		// Controlbar
-		if ($TMPL->fetch_param('controlbar') === FALSE AND ($playlist['params']['position'] OR $playlist['params']['size']) AND ( $player['params']['native_height'] == 0 OR ($player['params']['container_tag'] == 'audio' AND $player['params']['native_height'] === FALSE))) // if controlbar is unspecified AND a playlist is showing AND the height would be zero, default the controlbar to top.
+		if ($this->TMPL->fetch_param('controlbar') === FALSE AND ($playlist['params']['position'] OR $playlist['params']['size']) AND ( $player['params']['native_height'] == 0 OR ($player['params']['container_tag'] == 'audio' AND $player['params']['native_height'] === FALSE))) // if controlbar is unspecified AND a playlist is showing AND the height would be zero, default the controlbar to top.
 		{
 			$player['params']['controlbar'] = 'top';
-			$TMPL->log_item("NOTICE in MC Player plugin: Controlbar position defaults to 'top' when player height is zero and a playlist is shown; override with the 'controlbar' parameter.");
+			$this->_log_item("NOTICE in MC Player plugin: Controlbar position defaults to 'top' when player height is zero and a playlist is shown; override with the 'controlbar' parameter.");
 		}
-		elseif ( ($player['params']['native_height'] <= 64) && ($TMPL->fetch_param('controlbar') == 'over') ) // warn (but allow) if player height not enough to show controlbar in 'over' mode properly
+		elseif ( ($player['params']['native_height'] <= 64) && ($this->TMPL->fetch_param('controlbar') == 'over') ) // warn (but allow) if player height not enough to show controlbar in 'over' mode properly
 		{
 			$player['params']['controlbar'] = 'over';
-			$TMPL->log_item("WARNING in MC Player plugin: Player height is insufficient for properly displaying the controlbar in 'over' mode; controlbar may not display as intended.");
+			$this->_log_item("WARNING in MC Player plugin: Player height is insufficient for properly displaying the controlbar in 'over' mode; controlbar may not display as intended.");
 		}
-		elseif ( ($player['params']['native_height'] <= 64) && ($TMPL->fetch_param('controlbar') === FALSE) ) // default controlbar position for height < 64 is 'bottom'
+		elseif ( ($player['params']['native_height'] <= 64) && ($this->TMPL->fetch_param('controlbar') === FALSE) ) // default controlbar position for height < 64 is 'bottom'
 		{
 			$player['params']['controlbar'] = 'bottom';
-			$TMPL->log_item("NOTICE in MC Player plugin: Player height is insufficient for properly displaying the controlbar in the default 'over' mode; defaulting to 'bottom'; override with the 'controlbar' parameter.");
+			$this->_log_item("NOTICE in MC Player plugin: Player height is insufficient for properly displaying the controlbar in the default 'over' mode; defaulting to 'bottom'; override with the 'controlbar' parameter.");
 		}
-		elseif ($TMPL->fetch_param('controlbar'))
+		elseif ($this->TMPL->fetch_param('controlbar'))
 		{
-			$player['params']['controlbar'] = $TMPL->fetch_param('controlbar');
+			$player['params']['controlbar'] = $this->TMPL->fetch_param('controlbar');
 		}
 		else
 		{
@@ -372,18 +410,18 @@ class Mc_player
 		}
 		
 		// Streaming stuff
-		$player['params']['streamer'] = ($TMPL->fetch_param('streamer')) ? $TMPL->fetch_param('streamer') : '';
-		$player['params']['http_startparam'] = ($TMPL->fetch_param('http.startparam')) ? $TMPL->fetch_param('http.startparam') : '';
-		switch ($TMPL->fetch_param('provider'))
+		$player['params']['streamer'] = ($this->TMPL->fetch_param('streamer')) ? $this->TMPL->fetch_param('streamer') : '';
+		$player['params']['http_startparam'] = ($this->TMPL->fetch_param('http.startparam')) ? $this->TMPL->fetch_param('http.startparam') : '';
+		switch ($this->TMPL->fetch_param('provider'))
 			{
 				case 'http':
 				case 'rtmp':
 				case 'youtube':
-					$player['params']['provider'] = $TMPL->fetch_param('provider');
+					$player['params']['provider'] = $this->TMPL->fetch_param('provider');
 				case false:
 					break;
 				default:
-					$TMPL->log_item("WARNING in MC Player plugin: Specified 'provider' for player is not valid (http|rtmp|youtube); ignoring parameter");
+					$this->_log_item("WARNING in MC Player plugin: Specified 'provider' for player is not valid (http|rtmp|youtube); ignoring parameter");
 					unset($player['params']['provider'], $player['params']['streamer']);
 					break;
 			}
@@ -399,12 +437,31 @@ class Mc_player
 		// Create the container
 		switch ($player['params']['container_tag'])
 		{
-			case "div":
-			case "span":
-				$container = '<' . $player['params']['container_tag'] . $container_params . '>Javascript must be enabled to play this media.</'.$player['params']['container_tag'].'>';
-				break;
-			case "a":
-				$container = '<a href="'.$player['params']['file'].'"' . $container_params . '>Javascript must be enabled to play this media.</a>';
+
+			case "video":
+				$container = PHP_EOL . '<video' . $container_params;
+				if (isset($player['params']['file']) && $player['params']['file'] != '')
+				{
+					$container .= ' src="' . $player['params']['file'] . '"';
+				}
+				elseif (isset($playlist['code']) || (isset($playlist['params']['file']) && $playlist['params']['file'] != '')) // a playlist was specified
+				{
+					$this->_log_item("ERROR in MC Player plugin: Playlists are not supported by the '<video>' element (use 'div' instead of 'video'); unable to continue.");
+					return $this->TMPL->no_results();
+				}
+				else
+				{
+					$this->_log_item("ERROR in MC Player plugin: 'video' element specified but 'file' parameter not provided; unable to continue.");
+					return $this->TMPL->no_results();
+				}
+				$container .= ' width="' . $player['size']['width'] . '"';
+				$container .= ' height="' . $player['size']['height'] . '"';
+				if ($player['params']['image']) $container .= ' poster="' . $player['params']['image'] . '"';
+				if ($player['params']['controlbar'] != 'none') $container .= ' controls="controls"'; // show controlbar unless set to 'none'
+				if ($player['params']['bufferlength']) $container .= ' preload="auto"'; // autobuffer unless buffer set to 0
+				if ($player['params']['autostart']) $container .= ' autoplay="autoplay"';
+				if ($player['params']['bgcolor']) $container .= ' style="background-color: ' . $player['params']['bgcolor'] . ';"';
+				$container .= '>' . PHP_EOL . '</video>';
 				break;
 
 			case "audio":
@@ -413,7 +470,6 @@ class Mc_player
 // file specified. When native <audio> support is implemented,
 // replace the following section's <video> tags with <audio> tags.
 
-
 				$container = PHP_EOL . '<video' . $container_params;
 				if (isset($player['params']['file']) && $player['params']['file'] != '')
 				{
@@ -421,12 +477,13 @@ class Mc_player
 				}
 				elseif (isset($playlist['code']) || (isset($playlist['params']['file']) && $playlist['params']['file'] != '')) // a playlist was specified
 				{
-					// Nothing to do to the container tag here - but don't give an error, all is fine
+					$this->_log_item("ERROR in MC Player plugin: Playlists are not supported by the '<audio>' element (use 'div' instead of 'audio'); unable to continue.");
+					return $this->TMPL->no_results();
 				}
 				else
 				{
-					$TMPL->log_item("ERROR in MC Player plugin: '<audio>' element specified but neither 'file' parameter nor proper 'playlist' tag provided; unable to continue.");
-					return $TMPL->no_results();
+					$this->_log_item("ERROR in MC Player plugin: '<audio>' element specified but 'file' parameter not provided; unable to continue.");
+					return $this->TMPL->no_results();
 				}
 				$container .= ' width="' . $player['size']['width'] . '"';
 				$container .= ' height="' . $player['size']['height'] . '"';
@@ -439,36 +496,31 @@ class Mc_player
 				break;
 
 
-			 // We put "default" here because if an invalid
-			 // "container_tag" is specified, we want to write a
-			 // warning to the log, and then continue on to use the
-			 // regular "video" behavior
-			default:
-					$TMPL->log_item("WARNING in MC Player plugin: Specified 'container_tag' is not valid; defaulting to <video>");
-
-			case "video":
-				$container = PHP_EOL . '<video' . $container_params;
+			case "a":
+				$container = '<a' . $container_params;
 				if (isset($player['params']['file']) && $player['params']['file'] != '')
 				{
-					$container .= ' src="' . $player['params']['file'] . '"';
-				}
-				elseif (isset($playlist['code']) || (isset($playlist['params']['file']) && $playlist['params']['file'] != '')) // a playlist was specified
-				{
-					// Nothing to do to the container tag here - but don't give an error, all is fine
+					$container .= ' href="'.$player['params']['file'].'">Click to download (Javascript must be enabled to play this media)';
 				}
 				else
 				{
-					$TMPL->log_item("ERROR in MC Player plugin: '<video>' element specified but neither 'file' parameter nor proper 'playlist' tag provided; unable to continue.");
-					return $TMPL->no_results();
+					$this->_log_item("NOTICE in MC Player plugin: '<a>' element specified but no 'file' parameter provided; results may not be as expected for browsers without javascript.");
+					$container .= ' href="#">Javascript must be enabled to play this media';
 				}
-				$container .= ' width="' . $player['size']['width'] . '"';
-				$container .= ' height="' . $player['size']['height'] . '"';
-				if ($player['params']['image']) $container .= ' poster="' . $player['params']['image'] . '"';
-				if ($player['params']['controlbar'] != 'none') $container .= ' controls="controls"'; // show controlbar unless set to 'none'
-				if ($player['params']['bufferlength']) $container .= ' preload="auto"'; // autobuffer unless buffer set to 0
-				if ($player['params']['autostart']) $container .= ' autoplay="autoplay"';
-				if ($player['params']['bgcolor']) $container .= ' style="background-color: ' . $player['params']['bgcolor'] . ';"';
-				$container .= '>' . PHP_EOL . '</video>';
+				$container .= '</a>';
+				break;
+
+			 // We put "default" here because if an invalid
+			 // "container_tag" is specified, we want to write a
+			 // warning to the log, and then continue on to use the
+			 // regular "div" behavior
+			default:
+					$this->_log_item("WARNING in MC Player plugin: Specified 'container_tag' is not valid; defaulting to <div>");
+					$player['params']['container_tag'] = 'div';
+					
+			case "span":
+			case "div":
+				$container = '<' . $player['params']['container_tag'] . $container_params . '>Javascript must be enabled to play this media.</'.$player['params']['container_tag'].'>';
 				break;
 		}
 		
@@ -482,8 +534,8 @@ class Mc_player
 		$script = ($player['params']['playerpath']) ? PHP_EOL . "flashplayer: '" . $player['params']['playerpath'] . "'" . ',' : '';
 
 			$script_properties = array();
-			$script_properties['wmode'] = ($TMPL->fetch_param('wmode')) ? PHP_EOL . "wmode: '" . $TMPL->fetch_param('wmode') . "'" . ',' : PHP_EOL . "wmode: 'opaque'" . ',';
-			$script_properties['skin'] = ($TMPL->fetch_param('skin')) ? PHP_EOL . "skin: '" . $TMPL->fetch_param('skin') . "'" . ',' : '';
+			$script_properties['wmode'] = ($this->TMPL->fetch_param('wmode')) ? PHP_EOL . "wmode: '" . $this->TMPL->fetch_param('wmode') . "'" . ',' : PHP_EOL . "wmode: 'opaque'" . ',';
+			$script_properties['skin'] = ($this->TMPL->fetch_param('skin')) ? PHP_EOL . "skin: '" . $this->TMPL->fetch_param('skin') . "'" . ',' : '';
 			$script_properties['bgcolor'] = ($player['params']['bgcolor']) ? PHP_EOL . "bgcolor: '" . $player['params']['bgcolor'] . "'" . ',' : '';
 			$script_properties['width'] = ($player['size']['width']) ? PHP_EOL . "width: '" . $player['size']['width'] . "'" . ',' : '';
 			$script_properties['height'] = ($player['size']['height']) ? PHP_EOL . "height: '" . $player['size']['height'] . "'" . ',' : '';
@@ -505,25 +557,30 @@ class Mc_player
 	
 			// Determine which type of player to create based on which
 			// variables have been prepared by the other functions
-			if (isset($playlist['code']))
+			if (isset($playlist['code']) && $playlist['code'] != '')
 			{
 				// playlist exists
 				$script .= PHP_EOL . $playlist['code'] . ',';
+			}
+			elseif (isset($playlist['params']['file']) && $playlist['params']['file'] != '')
+			{
+				// Playlist mRSS file exists
+				$script .= PHP_EOL . "'playlistfile': '" . $playlist['params']['file'] . "'" . ',';
 			}
 			elseif ($levels)
 			{
 				// levels exist
 				$script .= PHP_EOL . $levels . ',';
 			}
-			elseif ($player['params']['file'])
+			elseif (isset($player['params']['file']) && $player['params']['file'] != '')
 			{
 				// regular file stuff
 				$script .= PHP_EOL . "file: '" . $player['params']['file'] . "'" . ',';
 			}
 			else
 			{
-				$TMPL->log_item("ERROR in MC Player plugin: No file, playlist, or levels specified; aborting");
-				return $TMPL->no_results();
+				$this->_log_item("ERROR in MC Player plugin: No file, playlist, or levels specified; aborting");
+				return $this->TMPL->no_results();
 			}
 			
 			if ($plugins)
@@ -556,7 +613,7 @@ class Mc_player
 						$script .= PHP_EOL . 'provider: "' . $player['params']['provider'] . '",';
 						break;
 					default:
-						$TMPL->log_item("WARNING in MC Player plugin: Specified 'provider' for player is not valid (http|rtmp|youtube); ignoring parameter");
+						$this->_log_item("WARNING in MC Player plugin: Specified 'provider' for player is not valid (http|rtmp|youtube); ignoring parameter");
 						unset($player['params']['provider'], $player['params']['streamer']);
 						break;
 				}
@@ -581,56 +638,56 @@ class Mc_player
 	 */
 	function playlist()
 	{
-		global $TMPL, $SESS;
+
 		
-		$SESS->cache['mc']['player']['playlist_file'] = ($TMPL->fetch_param('file')) ? $TMPL->fetch_param('file') : '';
+		$this->SESS->cache['mc']['player']['playlist_file'] = ($this->TMPL->fetch_param('file')) ? $this->TMPL->fetch_param('file') : '';
 		
 		// Size
-		if ($TMPL->fetch_param('size')) // if something was specified for 'size'...
+		if ($this->TMPL->fetch_param('size')) // if something was specified for 'size'...
 		{
-			if (ctype_digit($TMPL->fetch_param('size'))) // ...and if 'size' is an integer
+			if (ctype_digit($this->TMPL->fetch_param('size'))) // ...and if 'size' is an integer
 			{
-				$SESS->cache['mc']['player']['playlist_size'] = $TMPL->fetch_param('size');
+				$this->SESS->cache['mc']['player']['playlist_size'] = $this->TMPL->fetch_param('size');
 			}
 			else // otherwise, if 'size' ISN'T an integer, use default
 			{
-				$TMPL->log_item("WARNING in MC Player plugin: Specified 'size' for playlist is not an integer; resetting to default (180)");
-				$SESS->cache['mc']['player']['playlist_size'] = 160;
+				$this->_log_item("WARNING in MC Player plugin: Specified 'size' for playlist is not an integer; resetting to default (180)");
+				$this->SESS->cache['mc']['player']['playlist_size'] = 160;
 			}
 		}
 		
 		// Position
-		if ($TMPL->fetch_param('position'))
+		if ($this->TMPL->fetch_param('position'))
 		{
-			switch ($TMPL->fetch_param('position')) // input value verification
+			switch ($this->TMPL->fetch_param('position')) // input value verification
 			{
 				case "left":
 				case "right":
 				case "top":
 				case "bottom":
-					$SESS->cache['mc']['player']['playlist_position'] = $TMPL->fetch_param('position');
+					$this->SESS->cache['mc']['player']['playlist_position'] = $this->TMPL->fetch_param('position');
 					break;
 				default:
-					$TMPL->log_item("WARNING in MC Player plugin: Invalid 'position' for playlist tag; defaulting to 'bottom'");
-					$SESS->cache['mc']['player']['playlist_position'] = "bottom";
+					$this->_log_item("WARNING in MC Player plugin: Invalid 'position' for playlist tag; defaulting to 'bottom'");
+					$this->SESS->cache['mc']['player']['playlist_position'] = "bottom";
 					break;
 			}
 		}
 		
 		// Items
-		if (isset($SESS->cache['mc']['player']['items']) !== FALSE)
+		if (isset($this->SESS->cache['mc']['player']['items']) !== FALSE)
 		{
-			$SESS->cache['mc']['player']['playlist'] = "playlist: [" . $this->indent(trim($SESS->cache['mc']['player']['items'], ",")) . PHP_EOL . "]";
-			unset($SESS->cache['mc']['player']['items']);
+			$this->SESS->cache['mc']['player']['playlist'] = "playlist: [" . $this->indent(trim($this->SESS->cache['mc']['player']['items'], ",")) . PHP_EOL . "]";
+			unset($this->SESS->cache['mc']['player']['items']);
 		}
-		elseif (isset($SESS->cache['mc']['player']['playlist_file']) !== FALSE)
+		elseif (isset($this->SESS->cache['mc']['player']['playlist_file']) !== FALSE)
 		{
 			// do nothing; no error either
 		}
 		else
 		{
-			$TMPL->log_item("ERROR in MC Player plugin: 'playlist' container specified, but neither 'file' parameter nor embedded 'item' items were found");
-			return $TMPL->no_results();
+			$this->_log_item("ERROR in MC Player plugin: 'playlist' container specified, but neither 'file' parameter nor embedded 'item' items were found");
+			return $this->TMPL->no_results();
 		}
 	} // END function playlist()
 
@@ -645,26 +702,26 @@ class Mc_player
 	 */
 	function item()
 	{
-		global $TMPL, $SESS;
+
 
 		// Assignment
-		$item['params']['file'] = ($TMPL->fetch_param('file')) ? $TMPL->fetch_param('file') : '';
-		$item['params']['image'] = ($TMPL->fetch_param('image')) ? $TMPL->fetch_param('image') : '';
-		$item['params']['duration'] = ($TMPL->fetch_param('duration')) ? $TMPL->fetch_param('duration') : NULL;
-		$item['params']['start'] = ($TMPL->fetch_param('start')) ? $TMPL->fetch_param('start') : NULL;
-		$item['params']['title'] = ($TMPL->fetch_param('title')) ? $TMPL->fetch_param('title') : '';
-		$item['params']['description'] = ($TMPL->fetch_param('description')) ? $TMPL->fetch_param('description') : '';
-		$item['params']['streamer'] = ($TMPL->fetch_param('streamer')) ? $TMPL->fetch_param('streamer') : '';
-		$item['params']['provider'] = ($TMPL->fetch_param('provider')) ? $TMPL->fetch_param('provider') : '';
-		if (isset($SESS->cache['mc']['player']['levels']))
+		$item['params']['file'] = ($this->TMPL->fetch_param('file')) ? $this->TMPL->fetch_param('file') : '';
+		$item['params']['image'] = ($this->TMPL->fetch_param('image')) ? $this->TMPL->fetch_param('image') : '';
+		$item['params']['duration'] = ($this->TMPL->fetch_param('duration')) ? $this->TMPL->fetch_param('duration') : NULL;
+		$item['params']['start'] = ($this->TMPL->fetch_param('start')) ? $this->TMPL->fetch_param('start') : NULL;
+		$item['params']['title'] = ($this->TMPL->fetch_param('title')) ? $this->TMPL->fetch_param('title') : '';
+		$item['params']['description'] = ($this->TMPL->fetch_param('description')) ? $this->TMPL->fetch_param('description') : '';
+		$item['params']['streamer'] = ($this->TMPL->fetch_param('streamer')) ? $this->TMPL->fetch_param('streamer') : '';
+		$item['params']['provider'] = ($this->TMPL->fetch_param('provider')) ? $this->TMPL->fetch_param('provider') : '';
+		if (isset($this->SESS->cache['mc']['player']['levels']))
 		{
-			$item['levels'] = $SESS->cache['mc']['player']['levels'];
+			$item['levels'] = $this->SESS->cache['mc']['player']['levels'];
 		}
 		else
 		{
 			$item['levels'] = '';
 		}
-		unset($SESS->cache['mc']['player']['levels']);
+		unset($this->SESS->cache['mc']['player']['levels']);
 		
 
 	// Validation & Formatting
@@ -673,21 +730,21 @@ class Mc_player
 		if ($item['levels'])
 		{
 			$item['code'] = PHP_EOL . trim($item['levels'], ",\t" . PHP_EOL) . ",";
-			if ($item['params']['file']) $TMPL->log_item("NOTICE in MC Player plugin: 'file' specified for playlist item when 'levels' already specified; ignoring 'file'");
+			if ($item['params']['file']) $this->_log_item("NOTICE in MC Player plugin: 'file' specified for playlist item when 'levels' already specified; ignoring 'file'");
 		}
 		elseif ($item['params']['file'])
 		{
-			if (!isset($SESS->cache['mc']['player']['id']))
+			if (!isset($this->SESS->cache['mc']['player']['id']))
 			{
-				$SESS->cache['mc']['player']['id'] = '';
+				$this->SESS->cache['mc']['player']['id'] = '';
 			}
-			$SESS->cache['mc']['player']['id'] .= "_" . basename(html_entity_decode($item['params']['file'])); // used for auto-naming container ID
+			$this->SESS->cache['mc']['player']['id'] .= "_" . basename(html_entity_decode($item['params']['file'])); // used for auto-naming container ID
 			$item['code'] = PHP_EOL . 'file: "' . $item['params']['file'] . '",';
 		}
 		else
 		{
-			$TMPL->log_item("WARNING in MC Player plugin: No 'file' specified for playlist item; skipping");
-			return $TMPL->no_results();
+			$this->_log_item("WARNING in MC Player plugin: No 'file' specified for playlist item; skipping");
+			return $this->TMPL->no_results();
 		}
 		
 		// image
@@ -697,14 +754,14 @@ class Mc_player
 		if (ctype_digit($item['params']['duration'])) {
 			$item['code'] .= PHP_EOL . 'duration: ' . $item['params']['duration'] . ',';
 		} elseif ($item['params']['duration'] != '') {
-			$TMPL->log_item("WARNING in MC Player plugin: Specified 'duration' for item is not an integer; ignoring parameter");
+			$this->_log_item("WARNING in MC Player plugin: Specified 'duration' for item is not an integer; ignoring parameter");
 			unset($item['params']['duration']);
 		}
 		
 		if (ctype_digit($item['params']['start'])) {
 			$item['code'] .= PHP_EOL . 'start: '.$item['params']['start'].',';
 		} elseif ($item['params']['start'] != '') {
-			$TMPL->log_item("WARNING in MC Player plugin: Specified 'start' for item is not an integer; ignoring parameter");
+			$this->_log_item("WARNING in MC Player plugin: Specified 'start' for item is not an integer; ignoring parameter");
 			unset($item['params']['start']);
 		}
 
@@ -724,7 +781,7 @@ class Mc_player
 			case '':
 				break;
 			default:
-				$TMPL->log_item("WARNING in MC Player plugin: Specified 'provider' for item is not valid (http|rtmp|youtube); ignoring parameter");
+				$this->_log_item("WARNING in MC Player plugin: Specified 'provider' for item is not valid (http|rtmp|youtube); ignoring parameter");
 				unset($item['params']['provider']);
 				break;
 		}
@@ -734,11 +791,11 @@ class Mc_player
 		$item['code'] = PHP_EOL . "{" . $this->indent(trim($item['code'], ", ")) . PHP_EOL . "},";
 		
 		// store result in session for use upstream
-		if (!isset($SESS->cache['mc']['player']['items']))
+		if (!isset($this->SESS->cache['mc']['player']['items']))
 		{
-			$SESS->cache['mc']['player']['items'] = '';
+			$this->SESS->cache['mc']['player']['items'] = '';
 		}
-		$SESS->cache['mc']['player']['items'] .= $item['code'];
+		$this->SESS->cache['mc']['player']['items'] .= $item['code'];
 		
 	} // END function item()
 
@@ -753,17 +810,17 @@ class Mc_player
 	 */
 	function levels()
 	{
-		global $TMPL, $SESS;
 
-		if (isset($SESS->cache['mc']['player']['level_list']) !== FALSE)
+
+		if (isset($this->SESS->cache['mc']['player']['level_list']) !== FALSE)
 		{
-			$SESS->cache['mc']['player']['levels'] = PHP_EOL . "levels: [" . trim($SESS->cache['mc']['player']['level_list'], ",") . PHP_EOL . "]";
-			unset($SESS->cache['mc']['player']['level_list']);
+			$this->SESS->cache['mc']['player']['levels'] = PHP_EOL . "levels: [" . trim($this->SESS->cache['mc']['player']['level_list'], ",") . PHP_EOL . "]";
+			unset($this->SESS->cache['mc']['player']['level_list']);
 		}
 		else
 		{
-			$TMPL->log_item("ERROR in MC Player plugin: 'levels' container specified, but no 'level' items were found");
-			return $TMPL->no_results();
+			$this->_log_item("ERROR in MC Player plugin: 'levels' container specified, but no 'level' items were found");
+			return $this->TMPL->no_results();
 		}
 	} // END function levels()
 
@@ -778,12 +835,12 @@ class Mc_player
 	 */
 	function level()
 	{
-		global $TMPL, $SESS;
+
 
 		// Assignment
-		$level['params']['bitrate'] = ($TMPL->fetch_param('bitrate')) ? $TMPL->fetch_param('bitrate') : '';
-		$level['params']['width'] = ($TMPL->fetch_param('width')) ? $TMPL->fetch_param('width') : '';
-		$level['params']['file'] = ($TMPL->fetch_param('file')) ? $TMPL->fetch_param('file') : '';
+		$level['params']['bitrate'] = ($this->TMPL->fetch_param('bitrate')) ? $this->TMPL->fetch_param('bitrate') : '';
+		$level['params']['width'] = ($this->TMPL->fetch_param('width')) ? $this->TMPL->fetch_param('width') : '';
+		$level['params']['file'] = ($this->TMPL->fetch_param('file')) ? $this->TMPL->fetch_param('file') : '';
 
 		// Validation & Formatting
 		if (ctype_digit($level['params']['bitrate']))
@@ -792,7 +849,7 @@ class Mc_player
 		}
 		elseif ($level['params']['bitrate'])
 		{
-			$TMPL->log_item("WARNING in MC Player plugin: Specified 'bitrate' for level is not an integer; ignoring parameter");
+			$this->_log_item("WARNING in MC Player plugin: Specified 'bitrate' for level is not an integer; ignoring parameter");
 			unset($level['params']['bitrate']);
 		}
 		
@@ -802,25 +859,25 @@ class Mc_player
 		}
 		elseif ($level['params']['width'])
 		{
-			$TMPL->log_item("WARNING in MC Player plugin: Specified 'width' for level is not an integer; ignoring parameter");
+			$this->_log_item("WARNING in MC Player plugin: Specified 'width' for level is not an integer; ignoring parameter");
 			unset($level['params']['width']);
 		}
 		
 		if ($level['params']['file'])
 		{
-			$SESS->cache['mc']['player']['id'] .= "_" . basename(html_entity_decode($level['params']['file'])); // used for auto-naming container ID
+			$this->SESS->cache['mc']['player']['id'] .= "_" . basename(html_entity_decode($level['params']['file'])); // used for auto-naming container ID
 			$level['code']['file'] = 'file: "' . $level['params']['file'] . '"';
 		}
 		else
 		{
-			$TMPL->log_item("ERROR in MC Player plugin: No 'file' specified for level; unable to process level");
-			return $TMPL->no_results();
+			$this->_log_item("ERROR in MC Player plugin: No 'file' specified for level; unable to process level");
+			return $this->TMPL->no_results();
 		}
 
 		$level['code']['output'] = $this->indent(PHP_EOL . "{ " . $level['code']['bitrate'] . $level['code']['width'] . $level['code']['file'] . " },");
 
 		// store result in session for use upstream
-		$SESS->cache['mc']['player']['level_list'] .= $level['code']['output'];
+		$this->SESS->cache['mc']['player']['level_list'] .= $level['code']['output'];
 
 	} // END function level()
 
@@ -835,17 +892,17 @@ class Mc_player
 	 */
 	function plugins()
 	{
-		global $TMPL, $SESS;
 
-		if (isset($SESS->cache['mc']['player']['plugin_list']) !== FALSE)
+
+		if (isset($this->SESS->cache['mc']['player']['plugin_list']) !== FALSE)
 		{
-			$SESS->cache['mc']['player']['plugins'] = PHP_EOL . "plugins: {" . trim($SESS->cache['mc']['player']['plugin_list'], ",") . PHP_EOL . "}";
-			unset($SESS->cache['mc']['player']['plugin_list']);
+			$this->SESS->cache['mc']['player']['plugins'] = PHP_EOL . "plugins: {" . trim($this->SESS->cache['mc']['player']['plugin_list'], ",") . PHP_EOL . "}";
+			unset($this->SESS->cache['mc']['player']['plugin_list']);
 		}
 		else
 		{
-			$TMPL->log_item("ERROR in MC Player plugin: 'plugins' container specified, but no 'plugin' items were found");
-			return $TMPL->no_results();
+			$this->_log_item("ERROR in MC Player plugin: 'plugins' container specified, but no 'plugin' items were found");
+			return $this->TMPL->no_results();
 		}
 	} // END function plugins()
 
@@ -860,13 +917,13 @@ class Mc_player
 	 */
 	function plugin()
 	{
-		global $TMPL, $SESS;
 
-		if ($plugin_name = $TMPL->fetch_param('plugin_name'))
+
+		if ($plugin_name = $this->TMPL->fetch_param('plugin_name'))
 		{
 			// Process each param
 			$params = '';
-			foreach ($TMPL->tagparams as $pname => $pvalue)
+			foreach ($this->TMPL->tagparams as $pname => $pvalue)
 			{
 				if ($pname != "plugin_name") $params .= $pname . ': "' . $pvalue . '", ';
 			}
@@ -875,12 +932,12 @@ class Mc_player
 			$plugin = $this->indent(PHP_EOL . $plugin_name . ": { " . trim($params, ', ') . " },");
 
 			// store result in session for use upstream
-			$SESS->cache['mc']['player']['plugin_list'] .= $plugin;
+			$this->SESS->cache['mc']['player']['plugin_list'] .= $plugin;
 		}
 		else
 		{
-			$TMPL->log_item("ERROR in MC Player plugin: No 'plugin_name' specified for plugin; unable to continue");
-			return $TMPL->no_results();
+			$this->_log_item("ERROR in MC Player plugin: No 'plugin_name' specified for plugin; unable to continue");
+			return $this->TMPL->no_results();
 		}
 
 	} // END function plugin()
@@ -896,16 +953,16 @@ class Mc_player
 	 */
 	function modes()
 	{
-		global $TMPL, $SESS;
 
-		if (isset($SESS->cache['mc']['player']['mode_list']) !== FALSE)
+
+		if (isset($this->SESS->cache['mc']['player']['mode_list']) !== FALSE)
 		{
-			$SESS->cache['mc']['player']['modes'] = PHP_EOL . "modes: [" . trim($SESS->cache['mc']['player']['mode_list'], ",") . PHP_EOL . "]";
-			unset($SESS->cache['mc']['player']['mode_list']);
+			$this->SESS->cache['mc']['player']['modes'] = PHP_EOL . "modes: [" . trim($this->SESS->cache['mc']['player']['mode_list'], ",") . PHP_EOL . "]";
+			unset($this->SESS->cache['mc']['player']['mode_list']);
 		}
 		else
 		{
-			$TMPL->log_item("ERROR in MC Player plugin: 'modes' container specified, but no 'mode' items were found; ignoring.");
+			$this->_log_item("ERROR in MC Player plugin: 'modes' container specified, but no 'mode' items were found; ignoring.");
 		}
 	} // END function modes()
 
@@ -920,12 +977,10 @@ class Mc_player
 	 */
 	function mode()
 	{
-		global $TMPL, $SESS;
-		
 		
 		// Assignment
-		$mode['params']['type'] = ($TMPL->fetch_param('type')) ? $TMPL->fetch_param('type') : '';
-		$mode['params']['src'] = ($TMPL->fetch_param('src')) ? $TMPL->fetch_param('src') : '';
+		$mode['params']['type'] = ($this->TMPL->fetch_param('type')) ? $this->TMPL->fetch_param('type') : '';
+		$mode['params']['src'] = ($this->TMPL->fetch_param('src')) ? $this->TMPL->fetch_param('src') : '';
 		
 		
 		// $mode['code']['params'] = '';
@@ -940,7 +995,7 @@ class Mc_player
 				}
 				else
 				{
-					$TMPL->log_item("ERROR in MC Player plugin: No 'src' specified for 'flash' mode; skipping current mode");
+					$this->_log_item("ERROR in MC Player plugin: No 'src' specified for 'flash' mode; skipping current mode");
 				}
 				break;
 			
@@ -950,21 +1005,28 @@ class Mc_player
 				break;
 			
 			default:
-				$TMPL->log_item("ERROR in MC Player plugin: No 'type' specified for mode; skipping current mode");
+				$this->_log_item("ERROR in MC Player plugin: No 'type' specified for mode; skipping current mode");
 				break;
 		}
 		
 		// Include alternate config if specified
-		if (isset($SESS->cache['mc']['player']['mode']['config']) !== FALSE)
+		if (isset($this->SESS->cache['mc']['player']['mode']['config']) !== FALSE)
 		{
-			$mode['code']['params'] = PHP_EOL . "config: {" . trim($SESS->cache['mc']['player']['mode']['config'], ",") . PHP_EOL . "}";
-			unset($SESS->cache['mc']['player']['mode']['config']);
+			$mode['code']['params'] = PHP_EOL . "config: {" . trim($this->SESS->cache['mc']['player']['mode']['config'], ",") . PHP_EOL . "}";
+			unset($this->SESS->cache['mc']['player']['mode']['config']);
 		}
 		
 		// Format params into full plugin line
 		$mode['code']['output'] = $this->indent(PHP_EOL . "{ " . $this->indent(trim($mode['code']['params'], ', ')) . PHP_EOL . "},");
 		// store result in session for use upstream
-		$SESS->cache['mc']['player']['mode_list'] .= $mode['code']['output'];
+		if (isset($this->SESS->cache['mc']['player']['mode_list']))
+		{
+			$this->SESS->cache['mc']['player']['mode_list'] .= $mode['code']['output'];
+		}
+		else
+		{
+			$this->SESS->cache['mc']['player']['mode_list'] = $mode['code']['output'];
+		}
 
 	} // END function mode()
 
@@ -979,11 +1041,10 @@ class Mc_player
 	 */
 	function config()
 	{
-		global $TMPL, $SESS;
 
 			// Process each param
 			$params = '';
-			foreach ($TMPL->tagparams as $name => $value)
+			foreach ($this->TMPL->tagparams as $name => $value)
 			{
 				if ($name == 'provider')
 				{
@@ -997,7 +1058,7 @@ class Mc_player
 						case '':
 							break;
 						default:
-							$TMPL->log_item("WARNING in MC Player plugin: Specified 'provider' for mode is not valid (http|rtmp|youtube); ignoring parameter");
+							$this->_log_item("WARNING in MC Player plugin: Specified 'provider' for mode is not valid (http|rtmp|youtube); ignoring parameter");
 							break;
 					}
 				}
@@ -1008,7 +1069,7 @@ class Mc_player
 			}
 
 			// store result in session for use upstream
-			$SESS->cache['mc']['player']['mode']['config'] = $config;
+			$this->SESS->cache['mc']['player']['mode']['config'] = $config;
 
 	} // END function config()
 

@@ -1,5 +1,10 @@
 Changelog
 =========
+- 0.2.5 (2012-03-19):
+	- Abstracted much of the EE1/EE2 plugin code for improved maintainability
+	- Changed default player 'container_tag' from <video> to <div> due to the <video> tag's lack of playlist support
+	- Included additional debug log messages under various situations
+	- Bug fixes
 - 0.2.4 (2012-03-13):
 	- Made controlbar/playlist positioning smarter by default
 	- Bug fixes
