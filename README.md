@@ -1,5 +1,13 @@
+Plugin: MC Player
+=================
+An implementation of the JW HTML5 Media Player as an ExpressionEngine plugin.
+
+
 Changelog
 =========
+- 0.2.6 (2012-06-03):
+	- Added skin_height parameter
+	- Minor bug fixes
 - 0.2.5 (2012-03-19):
 	- Abstracted much of the EE1/EE2 plugin code for improved maintainability
 	- Changed default player 'container_tag' from <video> to <div> due to the <video> tag's lack of playlist support
